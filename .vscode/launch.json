@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/monoprior_prediction.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--image",
+                "data/Computer Desk-poly/keyframes/corrected_images",
+                "--camera",
+                "data/Computer Desk-poly/keyframes/corrected_cameras"
+            ]
+        }
+    ]
+}
