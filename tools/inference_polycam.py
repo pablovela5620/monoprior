@@ -67,8 +67,12 @@ def main(zip_path: Path):
         final_extract_dir / "depth" if (final_extract_dir / "depth").exists() else None
     )
 
-    assert image_dir.exists() and image_dir.is_dir(), "Image directory not found"
-    assert camera_dir.exists() and camera_dir.is_dir(), "Camera directory not found"
+    assert (
+        image_dir.exists() and image_dir.is_dir()
+    ), f"Image directory not found: {image_dir}"
+    assert (
+        camera_dir.exists() and camera_dir.is_dir()
+    ), f"Camera directory not found: {camera_dir}"
 
     image_paths = sorted(image_dir.glob("*.jpg"))
     camera_paths = sorted(camera_dir.glob("*.json"))

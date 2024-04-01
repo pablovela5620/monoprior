@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import json
 
@@ -12,7 +12,6 @@ class PolycamCameraData:
     fy: float
     height: int
     manual_keyframe: bool
-    neighbors: list[int]
     t_00: float
     t_01: float
     t_02: float
@@ -27,6 +26,7 @@ class PolycamCameraData:
     t_23: float
     timestamp: int
     width: int
+    neighbors: list[int] = field(default_factory=list)  # default value is an empty list
 
 
 def load_raw_polycam_data(camera_path: Path) -> PolycamCameraData:
