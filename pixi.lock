@@ -233,6 +233,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxkbcommon-1.7.0-h662e7e4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxml2-2.12.6-h232c23b_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.2.13-hd590300_5.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/lightning-utilities-0.11.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/llvm-openmp-15.0.7-h0cdce71_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/lz4-c-1.9.4-hcb278e6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/markupsafe-2.1.5-py310h2372a71_0.conda
@@ -286,6 +287,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/python_abi-3.10-4_cp310.conda
       - conda: https://conda.anaconda.org/pytorch/linux-64/pytorch-2.2.2-py3.10_cuda11.8_cudnn8.7.0_0.tar.bz2
       - conda: https://conda.anaconda.org/pytorch/linux-64/pytorch-cuda-11.8-h7e8668a_5.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/noarch/pytorch-lightning-2.2.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/pytorch/noarch/pytorch-mutex-1.0-cuda.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytz-2024.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyyaml-6.0.1-py310h2372a71_1.conda
@@ -312,6 +314,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tk-8.6.13-noxft_h4845f30_101.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/toml-0.10.2-pyhd8ed1ab_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/tomli-2.0.1-pyhd8ed1ab_0.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/noarch/torchmetrics-1.3.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/pytorch/linux-64/torchtriton-2.2.0-py310.tar.bz2
       - conda: https://conda.anaconda.org/pytorch/linux-64/torchvision-0.17.2-py310_cu118.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tornado-6.4-py310h2372a71_0.conda
@@ -351,9 +354,20 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/yaml-0.2.5-h7f98852_2.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zlib-1.2.13-hd590300_5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.5-hfc55251_0.conda
+      - pypi: https://files.pythonhosted.org/packages/9a/56/a1ba3e0fe737b9b20a45c10266ab88a0f44e5779fa751a7484259d8845ea/aria2p-0.12.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/35/bf/9cad857b630c840738003eb24c1adb63490a1024ec40a9dcc3a753300c38/asciimatics-1.15.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ba/d6/b3046c86cdbb32084b94bbf4324d47acc9991419c2775dc4038fff19950e/calibur-0.0.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/c9/7a/cef76fd8438a42f96db64ddaa85280485a9c395e7df3db8158cfec1eee34/dill-0.3.8-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/39/b8/3059245adb5e4421222aab3852ac7f47d68eba82c8c62b88928ec1c69431/fastcore-1.5.29-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ed/1f/95cb961341bf33e534a472672ef4916c90046dc3c57b1442f5586dda72f1/geffnet-1.0.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/03/0a/4f6fed21aa246c6b49b561ca55facacc2a44b87d65b8b92362a8e99ba202/loguru-0.7.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/bc/f7/7ec7fddc92e50714ea3745631f79bd9c96424cb2702632521028e57d3a36/multiprocess-0.70.16-py310-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/12/60/17ed502ab8258e36b6caf478974994f15691c73e3c46abf82a2ec63e9eda/omnidata_tools-0.0.23-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/64/7fdfb9386511cd6805451e012c537073a79a958a58795c4e602e538c388c/opencv_python-4.9.0.80-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/03/bef6fff907e212d67a0003f8ea4819307bba91b2856074a0763dd483ccc4/pyfiglet-1.0.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/a7/2c/4c64579f847bd5d539803c8b909e54ba087a79d01bb3aba433a95879a6c5/pyperclip-1.8.2.tar.gz
+      - pypi: https://files.pythonhosted.org/packages/fd/84/fd2ba7aafacbad3c4201d395674fc6348826569da3c0937e75505ead3528/wcwidth-0.2.13-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1e/70/1e88138a9afbed1d37093b85f0bebc3011623c4f47c166431599fe9d6c93/websocket_client-1.7.0-py3-none-any.whl
 packages:
 - kind: conda
   name: _libgcc_mutex
@@ -429,6 +443,31 @@ packages:
   - pkg:pypi/appdirs
   size: 12840
   timestamp: 1603108499239
+- kind: pypi
+  name: aria2p
+  version: 0.12.0
+  url: https://files.pythonhosted.org/packages/9a/56/a1ba3e0fe737b9b20a45c10266ab88a0f44e5779fa751a7484259d8845ea/aria2p-0.12.0-py3-none-any.whl
+  sha256: 476171257cdd8d74d888bcb983ecba5e9db19c2d8ecf9ef22547f88080b7bea8
+  requires_dist:
+  - appdirs >=1.4
+  - loguru >=0.5
+  - requests >=2.19
+  - tomli >=2.0 ; python_version < '3.11'
+  - websocket-client >=0.58
+  - asciimatics >=1.13 ; extra == 'tui'
+  - pyperclip >=1.8 ; extra == 'tui'
+  requires_python: '>=3.8'
+- kind: pypi
+  name: asciimatics
+  version: 1.15.0
+  url: https://files.pythonhosted.org/packages/35/bf/9cad857b630c840738003eb24c1adb63490a1024ec40a9dcc3a753300c38/asciimatics-1.15.0-py3-none-any.whl
+  sha256: 0fe068a6bed522929bd04bb5b8a2fb6ebf0aef1b7a9b3843cf71030a34bc38d5
+  requires_dist:
+  - pyfiglet >=0.7.2
+  - pillow >=2.7.0
+  - wcwidth
+  - pywin32 ; sys_platform == 'win32'
+  requires_python: '>=3.8'
 - kind: conda
   name: asttokens
   version: 2.4.1
@@ -1471,6 +1510,15 @@ packages:
   license_family: GPL
   size: 618596
   timestamp: 1640112124844
+- kind: pypi
+  name: dill
+  version: 0.3.8
+  url: https://files.pythonhosted.org/packages/c9/7a/cef76fd8438a42f96db64ddaa85280485a9c395e7df3db8158cfec1eee34/dill-0.3.8-py3-none-any.whl
+  sha256: c36ca9ffb54365bdd2f8eb3eff7d2a21237f8452b57ace88b1ac615b7e815bd7
+  requires_dist:
+  - objgraph >=1.7.2 ; extra == 'graph'
+  - gprof2dot >=2022.7.29 ; extra == 'profile'
+  requires_python: '>=3.8'
 - kind: conda
   name: docker-pycreds
   version: 0.4.0
@@ -1540,6 +1588,22 @@ packages:
   license_family: MIT
   size: 136778
   timestamp: 1680190541750
+- kind: pypi
+  name: fastcore
+  version: 1.5.29
+  url: https://files.pythonhosted.org/packages/39/b8/3059245adb5e4421222aab3852ac7f47d68eba82c8c62b88928ec1c69431/fastcore-1.5.29-py3-none-any.whl
+  sha256: a7d7e89faf968f2d8584df2deca344c3974f6cf476e1299cd3c067d8fa7440e9
+  requires_dist:
+  - pip
+  - packaging
+  - numpy ; extra == 'dev'
+  - nbdev >=0.2.39 ; extra == 'dev'
+  - matplotlib ; extra == 'dev'
+  - pillow ; extra == 'dev'
+  - torch ; extra == 'dev'
+  - pandas ; extra == 'dev'
+  - jupyterlab ; extra == 'dev'
+  requires_python: '>=3.7'
 - kind: conda
   name: ffmpeg
   version: 6.1.1
@@ -4114,6 +4178,25 @@ packages:
   size: 61588
   timestamp: 1686575217516
 - kind: conda
+  name: lightning-utilities
+  version: 0.11.2
+  build: pyhd8ed1ab_0
+  subdir: noarch
+  noarch: python
+  url: https://conda.anaconda.org/conda-forge/noarch/lightning-utilities-0.11.2-pyhd8ed1ab_0.conda
+  sha256: 30c1c8237f6e0bd70549239ebd0a4612770082b7768810347f9a450791801308
+  md5: 4673d6730745c981643f3eaedf539f76
+  depends:
+  - packaging >=17.1
+  - python >=3.8
+  - typing_extensions
+  license: Apache-2.0
+  license_family: APACHE
+  purls:
+  - pkg:pypi/lightning-utilities
+  size: 27246
+  timestamp: 1711597450115
+- kind: conda
   name: llvm-openmp
   version: 15.0.7
   build: h0cdce71_0
@@ -4129,6 +4212,37 @@ packages:
   license_family: APACHE
   size: 3268766
   timestamp: 1673584331056
+- kind: pypi
+  name: loguru
+  version: 0.7.2
+  url: https://files.pythonhosted.org/packages/03/0a/4f6fed21aa246c6b49b561ca55facacc2a44b87d65b8b92362a8e99ba202/loguru-0.7.2-py3-none-any.whl
+  sha256: 003d71e3d3ed35f0f8984898359d65b79e5b21943f78af86aa5491210429b8eb
+  requires_dist:
+  - aiocontextvars >=0.2.0 ; python_version < '3.7'
+  - colorama >=0.3.4 ; sys_platform == 'win32'
+  - win32-setctime >=1.0.0 ; sys_platform == 'win32'
+  - mypy ==0.910 ; python_version < '3.6' and extra == 'dev'
+  - tox ==3.27.1 ; python_version < '3.8' and extra == 'dev'
+  - pytest ==6.1.2 ; python_version < '3.8' and extra == 'dev'
+  - pytest-cov ==2.12.1 ; python_version < '3.8' and extra == 'dev'
+  - colorama ==0.4.5 ; python_version < '3.8' and extra == 'dev'
+  - freezegun ==1.1.0 ; python_version < '3.8' and extra == 'dev'
+  - mypy ==0.971 ; (python_version >= '3.6' and python_version < '3.7') and extra == 'dev'
+  - pytest-mypy-plugins ==1.9.3 ; (python_version >= '3.6' and python_version < '3.8') and extra == 'dev'
+  - exceptiongroup ==1.1.3 ; (python_version >= '3.7' and python_version < '3.11') and extra == 'dev'
+  - mypy ==1.4.1 ; (python_version >= '3.7' and python_version < '3.8') and extra == 'dev'
+  - pre-commit ==3.4.0 ; python_version >= '3.8' and extra == 'dev'
+  - tox ==4.11.0 ; python_version >= '3.8' and extra == 'dev'
+  - pytest ==7.4.0 ; python_version >= '3.8' and extra == 'dev'
+  - pytest-cov ==4.1.0 ; python_version >= '3.8' and extra == 'dev'
+  - pytest-mypy-plugins ==3.0.0 ; python_version >= '3.8' and extra == 'dev'
+  - colorama ==0.4.6 ; python_version >= '3.8' and extra == 'dev'
+  - freezegun ==1.2.2 ; python_version >= '3.8' and extra == 'dev'
+  - mypy ==1.5.1 ; python_version >= '3.8' and extra == 'dev'
+  - sphinx ==7.2.5 ; python_version >= '3.9' and extra == 'dev'
+  - sphinx-autobuild ==2021.3.14 ; python_version >= '3.9' and extra == 'dev'
+  - sphinx-rtd-theme ==1.3.0 ; python_version >= '3.9' and extra == 'dev'
+  requires_python: '>=3.5'
 - kind: conda
   name: lz4-c
   version: 1.9.4
@@ -4325,6 +4439,14 @@ packages:
   - pkg:pypi/mpmath
   size: 438339
   timestamp: 1678228210181
+- kind: pypi
+  name: multiprocess
+  version: 0.70.16
+  url: https://files.pythonhosted.org/packages/bc/f7/7ec7fddc92e50714ea3745631f79bd9c96424cb2702632521028e57d3a36/multiprocess-0.70.16-py310-none-any.whl
+  sha256: c4a9944c67bd49f823687463660a2d6daae94c289adff97e0f9d696ba6371d02
+  requires_dist:
+  - dill >=0.3.8
+  requires_python: '>=3.8'
 - kind: conda
   name: munkres
   version: 1.1.4
@@ -4509,6 +4631,17 @@ packages:
   license_family: BSD
   size: 135681
   timestamp: 1710946531879
+- kind: pypi
+  name: omnidata-tools
+  version: 0.0.23
+  url: https://files.pythonhosted.org/packages/12/60/17ed502ab8258e36b6caf478974994f15691c73e3c46abf82a2ec63e9eda/omnidata_tools-0.0.23-py3-none-any.whl
+  sha256: 13810718aa5ffac6057b0f981c19db51b389fc572c598bac05cda3ddfb5a2bbb
+  requires_dist:
+  - fastcore >=1.3.21
+  - multiprocess >=0.70.12.2
+  - aria2p[tui] >=0.10.4
+  - tqdm
+  requires_python: '>=3.6'
 - kind: pypi
   name: opencv-python
   version: 4.9.0.80
@@ -4889,6 +5022,12 @@ packages:
   - pkg:pypi/pyarrow
   size: 4502986
   timestamp: 1712758379342
+- kind: pypi
+  name: pyfiglet
+  version: 1.0.2
+  url: https://files.pythonhosted.org/packages/1a/03/bef6fff907e212d67a0003f8ea4819307bba91b2856074a0763dd483ccc4/pyfiglet-1.0.2-py3-none-any.whl
+  sha256: 889b351d79c99e50a3f619c8f8e6ffdb27fd8c939fc43ecbd7559bd57d5f93ea
+  requires_python: '>=3.9'
 - kind: conda
   name: pygments
   version: 2.17.2
@@ -4923,6 +5062,11 @@ packages:
   - pkg:pypi/pyparsing
   size: 89455
   timestamp: 1709721146886
+- kind: pypi
+  name: pyperclip
+  version: 1.8.2
+  url: https://files.pythonhosted.org/packages/a7/2c/4c64579f847bd5d539803c8b909e54ba087a79d01bb3aba433a95879a6c5/pyperclip-1.8.2.tar.gz
+  sha256: 105254a8b04934f0bc84e9c24eb360a591aaf6535c9def5f29d92af107a9bf57
 - kind: conda
   name: pyqt
   version: 5.15.9
@@ -5121,6 +5265,34 @@ packages:
   - libnvjpeg >=11.9.0.86,<12.0.0.28
   size: 3561
   timestamp: 1682528151734
+- kind: conda
+  name: pytorch-lightning
+  version: 2.2.2
+  build: pyhd8ed1ab_0
+  subdir: noarch
+  noarch: python
+  url: https://conda.anaconda.org/conda-forge/noarch/pytorch-lightning-2.2.2-pyhd8ed1ab_0.conda
+  sha256: 7311e8986627a41e1f8b50acb23e5f4eab8e599b3edec5624a10edc69346fb39
+  md5: 9ac85312eb13a6b6997cd4a82094470d
+  depends:
+  - fsspec >2021.06.0
+  - fsspec >=2022.5.0
+  - lightning-utilities >=0.8.0
+  - numpy >=1.17.2
+  - packaging >=20.0
+  - python >=3.8
+  - pytorch >=1.13.0
+  - pyyaml >=5.4
+  - requests
+  - torchmetrics >=0.7.0
+  - tqdm >=4.57.0
+  - typing-extensions >=4.4.0
+  - typing_extensions >=4.0.0
+  license: Apache-2.0
+  purls:
+  - pkg:pypi/pytorch-lightning
+  size: 439177
+  timestamp: 1712947907985
 - kind: conda
   name: pytorch-mutex
   version: '1.0'
@@ -5637,6 +5809,28 @@ packages:
   size: 15940
   timestamp: 1644342331069
 - kind: conda
+  name: torchmetrics
+  version: 1.3.2
+  build: pyhd8ed1ab_0
+  subdir: noarch
+  noarch: python
+  url: https://conda.anaconda.org/conda-forge/noarch/torchmetrics-1.3.2-pyhd8ed1ab_0.conda
+  sha256: 0eeddbceba25ed119cc683fc882d27b7cd1e599c3ddbabe3b3d4d11c6110006a
+  md5: 7d94763127fda157283dfb3cbe2dd1cb
+  depends:
+  - lightning-utilities >=0.8.0
+  - numpy >1.20.0
+  - packaging >17.1
+  - python >=3.8
+  - pytorch >=1.10.0
+  - setuptools
+  license: Apache-2.0
+  license_family: APACHE
+  purls:
+  - pkg:pypi/torchmetrics
+  size: 342056
+  timestamp: 1710773865057
+- kind: conda
   name: torchtriton
   version: 2.2.0
   build: py310
@@ -5860,6 +6054,25 @@ packages:
   - pkg:pypi/wandb
   size: 1515404
   timestamp: 1711408414225
+- kind: pypi
+  name: wcwidth
+  version: 0.2.13
+  url: https://files.pythonhosted.org/packages/fd/84/fd2ba7aafacbad3c4201d395674fc6348826569da3c0937e75505ead3528/wcwidth-0.2.13-py2.py3-none-any.whl
+  sha256: 3da69048e4540d84af32131829ff948f1e022c1c6bdb8d6102117aac784f6859
+  requires_dist:
+  - backports-functools-lru-cache >=1.2.1 ; python_version < '3.2'
+- kind: pypi
+  name: websocket-client
+  version: 1.7.0
+  url: https://files.pythonhosted.org/packages/1e/70/1e88138a9afbed1d37093b85f0bebc3011623c4f47c166431599fe9d6c93/websocket_client-1.7.0-py3-none-any.whl
+  sha256: f4c3d22fec12a2461427a29957ff07d35098ee2d976d3ba244e688b8b4057588
+  requires_dist:
+  - sphinx >=6.0 ; extra == 'docs'
+  - sphinx-rtd-theme >=1.1.0 ; extra == 'docs'
+  - python-socks ; extra == 'optional'
+  - wsaccel ; extra == 'optional'
+  - websockets ; extra == 'test'
+  requires_python: '>=3.8'
 - kind: conda
   name: wheel
   version: 0.43.0
