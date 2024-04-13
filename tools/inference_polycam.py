@@ -4,7 +4,7 @@ from pathlib import Path
 from PIL import Image
 from monopriors.monoprior import DsineAndUnidepth, MonoPriorPrediction
 import numpy as np
-from monopriors.data import load_raw_polycam_data
+from monopriors.data.polycam_data import load_raw_polycam_data
 import cv2
 import zipfile
 
@@ -86,9 +86,8 @@ def main(zip_path: Path):
     parent_path = Path("world")
     rr.log(f"{parent_path}", rr.ViewCoordinates.RUB, timeless=True)
 
-    timestep = 0
     for idx, (image_path, camera_path) in enumerate(zip(image_paths, camera_paths)):
-        rr.set_time_sequence("timestep", timestep)
+        rr.set_time_sequence("timestep", idx)
         assert image_path.stem == camera_path.stem, "Image and camera mismatch"
         rgb = np.array(Image.open(image_path))
         # load depth from polycam if available
@@ -100,6 +99,7 @@ def main(zip_path: Path):
                 gt_depth, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_NEAREST
             )
         cam_data = load_raw_polycam_data(camera_path)
+        # extract camera parameters fro
         K_33 = np.array(
             [
                 [cam_data.fx, 0, cam_data.cx],
@@ -117,7 +117,7 @@ def main(zip_path: Path):
             ]
         )
 
-        pred: MonoPriorPrediction = model(rgb)
+        pred: MonoPriorPrediction = model(rgb, K_33)
         depth_np_bhw1, normal_np_bhw3, _ = pred.to_numpy()
 
         parent_path = Path("world")
@@ -131,7 +131,6 @@ def main(zip_path: Path):
             K_33=K_33,
             gt_depth=gt_depth if depth_dir is not None else None,
         )
-        timestep += 1
 
 
 if __name__ == "__main__":
