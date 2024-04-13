@@ -12,7 +12,7 @@ download-example = {cmd = "huggingface-cli download pablovela5620/sample-polycam
 polycam-inference = {cmd = "python tools/inference_polycam.py --zip-path data/example-room-scan-poly.zip", depends_on=["post-install", "download-example"]}
 
 [dependencies]
-python = "3.11.*"
+python = "3.10.*"
 pip = ">=23.3.2,<23.4"
 cuda = {version = "*", channel="nvidia/label/cuda-11.8.0"}
 pytorch-cuda = {version = "11.8.*", channel="pytorch"}
@@ -26,8 +26,11 @@ matplotlib = ">=3.8.3,<3.9"
 wandb = ">=0.16.5,<0.17"
 scipy = ">=1.12.0,<1.13"
 timm = ">=0.9.16,<0.10"
+pandas = ">=2.2.2,<2.3"
+pyarrow = ">=15.0.2,<15.1"
 
 [pypi-dependencies]
 huggingface-hub = "*"
 opencv-python = "*"
 geffnet = "*"
+calibur = "==0.0.1"
