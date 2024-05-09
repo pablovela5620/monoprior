@@ -34,8 +34,8 @@ class DsineAndUnidepth(MonoPriorModel):
     def __init__(self) -> None:
         super().__init__()
         self.depth_model = UniDepthPredictor(device=self.device)
-        self.surface_model = OmniNormalPredictor(device=self.device)
-        # self.surface_model = DSineNormalPredictor(device=self.device)
+        # self.surface_model = OmniNormalPredictor(device=self.device)
+        self.surface_model = DSineNormalPredictor(device=self.device)
 
     def __call__(
         self,
