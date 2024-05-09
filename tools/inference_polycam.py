@@ -4,10 +4,13 @@ from pathlib import Path
 from PIL import Image
 from monopriors.monoprior import DsineAndUnidepth, MonoPriorPrediction
 import numpy as np
-from monopriors.data.polycam_data import load_raw_polycam_data
+from monopriors.data.polycam_data import load_raw_polycam_data, PolycamCameraData
+from monopriors.depth_fuser import Open3DFuser
 import cv2
 import zipfile
 from tqdm import tqdm
+from icecream import ic
+from jaxtyping import UInt8, UInt16, Float32
 
 
 def log_depth_pred(
@@ -48,23 +51,23 @@ def log_depth_pred(
         rr.log(f"{pinhole_path}/depth_error_l1", rr.Image(diff_depth_l1))
 
 
-def extract_zip(zip_path: Path, extract_dir: Path):
+def extract_zip(zip_path: Path, extract_dir: Path) -> None:
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(extract_dir)
 
 
 def main(zip_path: Path):
-    extract_dir = zip_path.parent / zip_path.stem
+    extract_dir: Path = zip_path.parent / zip_path.stem
 
     if zip_path.is_file() and zip_path.exists() and (not extract_dir.exists()):
         extract_zip(zip_path, extract_dir=extract_dir)
-        final_extract_dir = extract_dir / extract_dir.name
+        final_extract_dir: Path = extract_dir / extract_dir.name
     else:
-        final_extract_dir = extract_dir / extract_dir.name
+        final_extract_dir: Path = extract_dir / extract_dir.name
 
-    image_dir = final_extract_dir / "corrected_images"
-    camera_dir = final_extract_dir / "corrected_cameras"
-    depth_dir = (
+    image_dir: Path = final_extract_dir / "corrected_images"
+    camera_dir: Path = final_extract_dir / "corrected_cameras"
+    depth_dir: Path = (
         final_extract_dir / "depth" if (final_extract_dir / "depth").exists() else None
     )
 
@@ -75,34 +78,40 @@ def main(zip_path: Path):
         camera_dir.exists() and camera_dir.is_dir()
     ), f"Camera directory not found: {camera_dir}"
 
-    image_paths = sorted(image_dir.glob("*.jpg"))
-    camera_paths = sorted(camera_dir.glob("*.json"))
+    image_paths: list[Path] = sorted(image_dir.glob("*.jpg"))
+    camera_paths: list[Path] = sorted(camera_dir.glob("*.json"))
     if depth_dir is not None:
         assert depth_dir.exists() and depth_dir.is_dir(), "Depth directory not found"
-        depth_paths = sorted(depth_dir.glob("*.png"))
+        depth_paths: list[Path] = sorted(depth_dir.glob("*.png"))
         assert len(image_paths) == len(depth_paths), "Image and depth mismatch"
 
     model = DsineAndUnidepth()
+    fuser = Open3DFuser()
 
-    parent_path = Path("world")
+    parent_path: Path = Path("world")
     rr.log(f"{parent_path}", rr.ViewCoordinates.RUB, timeless=True)
+
+    height, width, _ = np.array(Image.open(image_paths[0])).shape
 
     pbar = tqdm(zip(image_paths, camera_paths), total=len(image_paths))
     for idx, (image_path, camera_path) in enumerate(pbar):
         rr.set_time_sequence("timestep", idx)
         assert image_path.stem == camera_path.stem, "Image and camera mismatch"
-        rgb = np.array(Image.open(image_path))
+        rgb_hw3: UInt8[np.ndarray, "h w 3"] = np.array(Image.open(image_path))
         # load depth from polycam if available
         if depth_dir is not None:
             # depth of shape 256x192
             gt_depth = cv2.imread(str(depth_paths[idx]), cv2.IMREAD_ANYDEPTH)
             # upscale to image size
-            gt_depth = cv2.resize(
-                gt_depth, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_NEAREST
+            gt_depth: UInt16[np.ndarray, "h w 3"] = cv2.resize(
+                gt_depth,
+                (width, height),
+                interpolation=cv2.INTER_NEAREST,
             )
-        cam_data = load_raw_polycam_data(camera_path)
+
+        cam_data: PolycamCameraData = load_raw_polycam_data(camera_path)
         # extract camera parameters fro
-        K_33 = np.array(
+        K_33: Float32[np.ndarray, "3 3"] = np.array(
             [
                 [cam_data.fx, 0, cam_data.cx],
                 [0, cam_data.fy, cam_data.cy],
@@ -110,29 +119,41 @@ def main(zip_path: Path):
             ],
             dtype=np.float32,
         )
-        cam_T_world = np.array(
+        cam_T_world_44: Float32[np.ndarray, "4 4"] = np.array(
             [
                 [cam_data.t_00, cam_data.t_01, cam_data.t_02, cam_data.t_03],
                 [cam_data.t_10, cam_data.t_11, cam_data.t_12, cam_data.t_13],
                 [cam_data.t_20, cam_data.t_21, cam_data.t_22, cam_data.t_23],
                 [0, 0, 0, 1],
-            ]
+            ],
+            dtype=np.float32,
         )
 
-        pred: MonoPriorPrediction = model(rgb, K_33)
+        pred: MonoPriorPrediction = model(rgb_hw3, K_33)
         depth_np_bhw1, normal_np_bhw3, _ = pred.to_numpy()
+        fuser.fuse_frames(depth_np_bhw1, K_33, cam_T_world_44, rgb_hw3)
 
-        parent_path = Path("world")
         log_depth_pred(
             parent_path=parent_path,
-            rgb=rgb,
+            rgb=rgb_hw3,
             depth_np=depth_np_bhw1[0],
             normal_np=normal_np_bhw3[0],
-            rotation=cam_T_world[:3, :3],
-            translation=cam_T_world[:3, 3],
+            rotation=cam_T_world_44[:3, :3],
+            translation=cam_T_world_44[:3, 3],
             K_33=K_33,
             gt_depth=gt_depth if depth_dir is not None else None,
         )
+        if idx == 5:
+            break
+    mesh = fuser.get_mesh()
+    ic(np.asarray(mesh.vertices), np.asarray(mesh.triangles))
+    rr.log(
+        f"{parent_path}/mesh",
+        rr.Mesh3D(
+            vertex_positions=np.asarray(mesh.vertices),
+            indices=np.asarray(mesh.triangles),
+        ),
+    )
 
 
 if __name__ == "__main__":
