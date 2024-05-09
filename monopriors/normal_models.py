@@ -46,7 +46,7 @@ class DSineNormalPredictor:
 
     def __call__(
         self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
-    ) -> Float[torch.Tensor, "b 1 h w"]:
+    ) -> Float[torch.Tensor, "b 3 h w"]:
         # preprocess the input image
         rgb = rgb.astype(np.float32) / 255.0
         rgb = torch.from_numpy(rgb).permute(2, 0, 1).unsqueeze(0).to(self.device)
@@ -119,7 +119,7 @@ class OmniNormalPredictor:
 
     def __call__(
         self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
-    ) -> Float[torch.Tensor, "b 1 h w"]:
+    ) -> Float[torch.Tensor, "b 3 h w"]:
         rgb = rgb.astype(np.float32) / 255.0
         img_3hw = torch.from_numpy(rgb).permute(2, 0, 1)
         _, H, W = img_3hw.shape
@@ -135,4 +135,5 @@ class OmniNormalPredictor:
             normal_3hw = TF.resize(normal_3hw, (H, W), antialias=None)
 
         normal_b3hw = normal_3hw.unsqueeze(0)
+        # generates normal that is between 0-1 in the OpenCV Format (RDF)
         return normal_b3hw
