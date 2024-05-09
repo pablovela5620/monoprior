@@ -1,5 +1,5 @@
 [project]
-name = "mini-monoprior"
+name = "monopriors"
 version = "0.1.0"
 
 dependencies=[
