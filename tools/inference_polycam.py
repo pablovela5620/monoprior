@@ -7,6 +7,7 @@ import numpy as np
 from monopriors.data.polycam_data import load_raw_polycam_data
 import cv2
 import zipfile
+from tqdm import tqdm
 
 
 def log_depth_pred(
@@ -86,7 +87,8 @@ def main(zip_path: Path):
     parent_path = Path("world")
     rr.log(f"{parent_path}", rr.ViewCoordinates.RUB, timeless=True)
 
-    for idx, (image_path, camera_path) in enumerate(zip(image_paths, camera_paths)):
+    pbar = tqdm(zip(image_paths, camera_paths), total=len(image_paths))
+    for idx, (image_path, camera_path) in enumerate(pbar):
         rr.set_time_sequence("timestep", idx)
         assert image_path.stem == camera_path.stem, "Image and camera mismatch"
         rgb = np.array(Image.open(image_path))
