@@ -14,14 +14,12 @@ from jaxtyping import UInt8, UInt16, Float32
 
 
 def log_depth_pred(
-    parent_path,
-    rgb,
-    depth_np,
-    normal_np,
-    rotation,
-    translation,
-    K_33,
-    gt_depth=None,
+    parent_path: Path,
+    rgb: UInt8[np.ndarray, "h w 3"],
+    depth_np: Float32[np.ndarray, "h w 1"],
+    normal_np: Float32[np.ndarray, "h w 3"],
+    cam_data: PolycamCameraData,
+    gt_depth: UInt16[np.ndarray, "h w 1"] | None = None,
 ):
     cam_path = parent_path / "cam"
     pinhole_path = cam_path / "pinhole"
@@ -29,23 +27,27 @@ def log_depth_pred(
 
     rr.log(
         f"{cam_path}",
-        rr.Transform3D(translation=translation, mat3x3=rotation, from_parent=False),
+        rr.Transform3D(
+            translation=cam_data.cam_T_world_44[:3, 3],
+            mat3x3=cam_data.cam_T_world_44[:3, :3],
+            from_parent=True,
+        ),
     )
     rr.log(
         f"{pinhole_path}",
         rr.Pinhole(
-            image_from_camera=K_33,
+            image_from_camera=cam_data.K_33,
             width=w,
             height=h,
-            camera_xyz=rr.ViewCoordinates.RUB,
+            camera_xyz=rr.ViewCoordinates.RDF,
         ),
     )
     rr.log(f"{pinhole_path}/image", rr.Image(rgb))
-    rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_np, meter=1))
+    rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_np, meter=1000))
     rr.log(f"{pinhole_path}/normal", rr.Image(normal_np))
     if gt_depth is not None:
         rr.log(f"{pinhole_path}/gt_depth", rr.DepthImage(gt_depth, meter=1000))
-        diff_depth_l1 = np.abs((depth_np[:, :, 0] - gt_depth / 1000))
+        diff_depth_l1 = np.abs((depth_np.squeeze() - gt_depth))
         # normalize to 0-255
         diff_depth_l1 = (diff_depth_l1 / diff_depth_l1.max() * 255).astype(np.uint8)
         rr.log(f"{pinhole_path}/depth_error_l1", rr.Image(diff_depth_l1))
@@ -86,7 +88,8 @@ def main(zip_path: Path):
         assert len(image_paths) == len(depth_paths), "Image and depth mismatch"
 
     model = DsineAndUnidepth()
-    fuser = Open3DFuser()
+    gt_fuser = Open3DFuser()
+    pred_fuser = Open3DFuser()
 
     parent_path: Path = Path("world")
     rr.log(f"{parent_path}", rr.ViewCoordinates.RUB, timeless=True)
@@ -101,57 +104,61 @@ def main(zip_path: Path):
         # load depth from polycam if available
         if depth_dir is not None:
             # depth of shape 256x192
-            gt_depth = cv2.imread(str(depth_paths[idx]), cv2.IMREAD_ANYDEPTH)
+            gt_depth_hw = cv2.imread(str(depth_paths[idx]), cv2.IMREAD_ANYDEPTH)
             # upscale to image size
-            gt_depth: UInt16[np.ndarray, "h w 3"] = cv2.resize(
-                gt_depth,
+            gt_depth_hw: UInt16[np.ndarray, "h w"] = cv2.resize(
+                gt_depth_hw,
                 (width, height),
                 interpolation=cv2.INTER_NEAREST,
             )
 
         cam_data: PolycamCameraData = load_raw_polycam_data(camera_path)
-        # extract camera parameters fro
-        K_33: Float32[np.ndarray, "3 3"] = np.array(
-            [
-                [cam_data.fx, 0, cam_data.cx],
-                [0, cam_data.fy, cam_data.cy],
-                [0, 0, 1],
-            ],
-            dtype=np.float32,
-        )
-        cam_T_world_44: Float32[np.ndarray, "4 4"] = np.array(
-            [
-                [cam_data.t_00, cam_data.t_01, cam_data.t_02, cam_data.t_03],
-                [cam_data.t_10, cam_data.t_11, cam_data.t_12, cam_data.t_13],
-                [cam_data.t_20, cam_data.t_21, cam_data.t_22, cam_data.t_23],
-                [0, 0, 0, 1],
-            ],
-            dtype=np.float32,
-        )
 
-        pred: MonoPriorPrediction = model(rgb_hw3, K_33)
+        pred: MonoPriorPrediction = model(rgb_hw3, cam_data.K_33)
+        depth_np_bhw1: Float32[np.ndarray, "b h w 1"]
+        normal_np_bhw3: Float32[np.ndarray, "b h w 3"]
         depth_np_bhw1, normal_np_bhw3, _ = pred.to_numpy()
-        fuser.fuse_frames(depth_np_bhw1, K_33, cam_T_world_44, rgb_hw3)
+        depth_np_bhw1: UInt16[np.ndarray, "b h w 1"] = (depth_np_bhw1 * 1000).astype(
+            np.uint16
+        )  # convert to mm and Uint16
+        gt_fuser.fuse_frames(
+            gt_depth_hw, cam_data.K_33, cam_data.cam_T_world_44, rgb_hw3
+        )
+        pred_fuser.fuse_frames(
+            depth_np_bhw1.squeeze(), cam_data.K_33, cam_data.cam_T_world_44, rgb_hw3
+        )
 
         log_depth_pred(
             parent_path=parent_path,
             rgb=rgb_hw3,
             depth_np=depth_np_bhw1[0],
             normal_np=normal_np_bhw3[0],
-            rotation=cam_T_world_44[:3, :3],
-            translation=cam_T_world_44[:3, 3],
-            K_33=K_33,
-            gt_depth=gt_depth if depth_dir is not None else None,
+            cam_data=cam_data,
+            gt_depth=gt_depth_hw if depth_dir is not None else None,
         )
-        if idx == 5:
-            break
-    mesh = fuser.get_mesh()
-    ic(np.asarray(mesh.vertices), np.asarray(mesh.triangles))
+    gt_mesh = gt_fuser.get_mesh()
+    gt_mesh.compute_vertex_normals()
+
+    pred_mesh = pred_fuser.get_mesh()
+    pred_mesh.compute_vertex_normals()
+
     rr.log(
-        f"{parent_path}/mesh",
+        f"{parent_path}/gt_mesh",
         rr.Mesh3D(
-            vertex_positions=np.asarray(mesh.vertices),
-            indices=np.asarray(mesh.triangles),
+            vertex_positions=gt_mesh.vertices,
+            indices=gt_mesh.triangles,
+            vertex_normals=gt_mesh.vertex_normals,
+            vertex_colors=gt_mesh.vertex_colors,
+        ),
+    )
+
+    rr.log(
+        f"{parent_path}/pred_mesh",
+        rr.Mesh3D(
+            vertex_positions=pred_mesh.vertices,
+            indices=pred_mesh.triangles,
+            vertex_normals=pred_mesh.vertex_normals,
+            vertex_colors=pred_mesh.vertex_colors,
         ),
     )
 
