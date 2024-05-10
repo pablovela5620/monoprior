@@ -31,7 +31,7 @@ pandas = ">=2.2.2,<2.3"
 pyarrow = ">=15.0.2,<15.1"
 pytorch-lightning = ">=2.2.2,<2.3"
 xformers = ">=0.0.26.post1,<0.0.27"
-open3d = ">=0.18.0,<0.19"
+jupyterlab = ">=4.2.0,<4.3"
 
 [pypi-dependencies]
 huggingface-hub = "*"
@@ -40,3 +40,4 @@ geffnet = "*"
 calibur = "==0.0.1"
 omnidata-tools = "*"
 monopriors = { path = ".", editable = true}
+open3d = "*"
