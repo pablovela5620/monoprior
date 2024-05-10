@@ -40,20 +40,18 @@ class Open3DFuser(DepthFuser):
 
     def fuse_frames(
         self,
-        depth_bhw1: UInt16[np.ndarray, "b h w 1"],
+        depth_hw: UInt16[np.ndarray, "h w"],
         K_33: Float32[np.ndarray, "3 3"],
         cam_T_world_44: Float32[np.ndarray, "4 4"],
         rgb_hw3: UInt8[np.ndarray, "h w 3"],
     ) -> None:
-        height = depth_bhw1.shape[1]
-        width = depth_bhw1.shape[2]
-
-        depth_hw = depth_bhw1.squeeze() / 1000.0
+        height = depth_hw.shape[0]
+        width = depth_hw.shape[1]
 
         rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
             o3d.geometry.Image(rgb_hw3),
             o3d.geometry.Image(depth_hw),
-            depth_scale=1.0,
+            depth_scale=1000.0,
             depth_trunc=self.fusion_max_depth,
             convert_rgb_to_intensity=False,
         )
