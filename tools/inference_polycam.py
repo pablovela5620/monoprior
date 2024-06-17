@@ -9,15 +9,14 @@ from monopriors.depth_fuser import Open3DFuser
 import cv2
 import zipfile
 from tqdm import tqdm
-from icecream import ic
 from jaxtyping import UInt8, UInt16, Float32
+from einops import rearrange
 
 
-def log_depth_pred(
+def log_mono_pred(
     parent_path: Path,
     rgb: UInt8[np.ndarray, "h w 3"],
-    depth_np: Float32[np.ndarray, "h w 1"],
-    normal_np: Float32[np.ndarray, "h w 3"],
+    mono_pred: MonoPriorPrediction,
     cam_data: PolycamCameraData,
     gt_depth: UInt16[np.ndarray, "h w 1"] | None = None,
 ):
@@ -42,15 +41,23 @@ def log_depth_pred(
             camera_xyz=rr.ViewCoordinates.RDF,
         ),
     )
+    depth_np, normal_np, _, depth_conf_np, normal_conf_np = mono_pred.to_numpy()
+    if depth_conf_np is not None:
+        depth_np = depth_np * (depth_conf_np > 0.5)
+
+    if normal_conf_np is not None:
+        normal_conf_np = rearrange(normal_conf_np, "1 h w c -> h w c")
+        rr.log(f"{pinhole_path}/normal_conf_np", rr.DepthImage(normal_conf_np))
+
     rr.log(f"{pinhole_path}/image", rr.Image(rgb))
     rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_np, meter=1000))
     rr.log(f"{pinhole_path}/normal", rr.Image(normal_np))
     if gt_depth is not None:
         rr.log(f"{pinhole_path}/gt_depth", rr.DepthImage(gt_depth, meter=1000))
-        diff_depth_l1 = np.abs((depth_np.squeeze() - gt_depth))
+        # diff_depth_l1 = np.abs((depth_np.squeeze() - gt_depth))
         # normalize to 0-255
-        diff_depth_l1 = (diff_depth_l1 / diff_depth_l1.max() * 255).astype(np.uint8)
-        rr.log(f"{pinhole_path}/depth_error_l1", rr.Image(diff_depth_l1))
+        # diff_depth_l1 = (diff_depth_l1 / diff_depth_l1.max() * 255).astype(np.uint8)
+        # rr.log(f"{pinhole_path}/depth_error_l1", rr.Image(diff_depth_l1))
 
 
 def extract_zip(zip_path: Path, extract_dir: Path) -> None:
@@ -117,7 +124,7 @@ def main(zip_path: Path):
         pred: MonoPriorPrediction = model(rgb_hw3, cam_data.K_33)
         depth_np_bhw1: Float32[np.ndarray, "b h w 1"]
         normal_np_bhw3: Float32[np.ndarray, "b h w 3"]
-        depth_np_bhw1, normal_np_bhw3, _ = pred.to_numpy()
+        depth_np_bhw1, normal_np_bhw3, _, _, _ = pred.to_numpy()
         depth_np_bhw1: UInt16[np.ndarray, "b h w 1"] = (depth_np_bhw1 * 1000).astype(
             np.uint16
         )  # convert to mm and Uint16
@@ -128,11 +135,10 @@ def main(zip_path: Path):
             depth_np_bhw1.squeeze(), cam_data.K_33, cam_data.cam_T_world_44, rgb_hw3
         )
 
-        log_depth_pred(
+        log_mono_pred(
             parent_path=parent_path,
             rgb=rgb_hw3,
-            depth_np=depth_np_bhw1[0],
-            normal_np=normal_np_bhw3[0],
+            mono_pred=pred,
             cam_data=cam_data,
             gt_depth=gt_depth_hw if depth_dir is not None else None,
         )
@@ -146,7 +152,7 @@ def main(zip_path: Path):
         f"{parent_path}/gt_mesh",
         rr.Mesh3D(
             vertex_positions=gt_mesh.vertices,
-            indices=gt_mesh.triangles,
+            triangle_indices=gt_mesh.triangles,
             vertex_normals=gt_mesh.vertex_normals,
             vertex_colors=gt_mesh.vertex_colors,
         ),
@@ -156,7 +162,7 @@ def main(zip_path: Path):
         f"{parent_path}/pred_mesh",
         rr.Mesh3D(
             vertex_positions=pred_mesh.vertices,
-            indices=pred_mesh.triangles,
+            triangle_indices=pred_mesh.triangles,
             vertex_normals=pred_mesh.vertex_normals,
             vertex_colors=pred_mesh.vertex_colors,
         ),

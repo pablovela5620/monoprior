@@ -162,3 +162,4 @@ cython_debug/
 # pixi environments
 .pixi
 data/*
+checkpoints/*

@@ -6,7 +6,7 @@ channels = ["nvidia/label/cuda-11.8.0", "nvidia", "xformers", "conda-forge", "py
 platforms = ["linux-64"]
 
 [system-requirements]
-libc = { family="glibc", version="2.30" }
+libc = { family="glibc", version="2.31" }
 
 [tasks]
 download-example = {cmd = "ls data/example-room-scan-poly.zip || huggingface-cli download pablovela5620/sample-polycam-room example-room-scan-poly.zip --repo-type dataset --local-dir data/", outputs = ["data/example-room-scan-poly.zip"] }
@@ -19,10 +19,9 @@ cuda = {version = "*", channel="nvidia/label/cuda-11.8.0"}
 pytorch-cuda = {version = "11.8.*", channel="pytorch"}
 pytorch = {version = "2.3.*", channel="pytorch"}
 torchvision = {version = "0.18.*", channel="pytorch"}
-rerun-sdk = "0.15.1"
 icecream = ">=2.1.3,<2.2"
 jaxtyping = ">=0.2.28,<0.3"
-einops = ">=0.7.0,<0.8"
+einops = ">=0.8.0,<0.9"
 matplotlib = ">=3.8.3,<3.9"
 wandb = ">=0.16.5,<0.17"
 scipy = ">=1.12.0,<1.13"
@@ -32,6 +31,7 @@ pyarrow = ">=15.0.2,<15.1"
 pytorch-lightning = ">=2.2.2,<2.3"
 xformers = ">=0.0.26.post1,<0.0.27"
 jupyterlab = ">=4.2.0,<4.3"
+rerun-sdk = ">=0.16.1,<0.17"
 
 [pypi-dependencies]
 huggingface-hub = "*"
@@ -41,3 +41,6 @@ calibur = "==0.0.1"
 omnidata-tools = "*"
 monopriors = { path = ".", editable = true}
 open3d = "*"
+gradio-imageslider = "*"
+gradio = "*"
+gradio-rerun = { version = ">=0.0.3" }
