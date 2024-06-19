@@ -32,6 +32,7 @@ pytorch-lightning = ">=2.2.2,<2.3"
 xformers = ">=0.0.26.post1,<0.0.27"
 jupyterlab = ">=4.2.0,<4.3"
 rerun-sdk = ">=0.16.1,<0.17"
+numpy = "<2.0.0"
 
 [pypi-dependencies]
 huggingface-hub = "*"
