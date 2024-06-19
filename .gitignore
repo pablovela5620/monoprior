@@ -163,3 +163,4 @@ cython_debug/
 .pixi
 data/*
 checkpoints/*
+examples/*
