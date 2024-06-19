@@ -8,10 +8,31 @@ platforms = ["linux-64"]
 [system-requirements]
 libc = { family="glibc", version="2.31" }
 
-[tasks]
-download-example = {cmd = "ls data/example-room-scan-poly.zip || huggingface-cli download pablovela5620/sample-polycam-room example-room-scan-poly.zip --repo-type dataset --local-dir data/", outputs = ["data/example-room-scan-poly.zip"] }
-polycam-inference = {cmd = "python tools/inference_polycam.py --zip-path data/example-room-scan-poly.zip", depends_on=["download-example"]}
+[tasks.download-example]
+cmd = """
+    test -e data/example-room-scan-poly.zip
+    || (
+        huggingface-cli download pablovela5620/sample-polycam-room \
+        example-room-scan-poly.zip --repo-type dataset \
+        --local-dir data/
+    )
+    """
+outputs = ["data/example-room-scan-poly.zip"]
+description = "Downloads an example polycam dataset from huggingface"
 
+[tasks.polycam-inference]
+cmd = """
+    python tools/inference_polycam.py \
+    --zip-path data/example-room-scan-poly.zip
+    """
+depends_on=["download-example"]
+description = "Runs inference on polycam dataset on downloaded example, this will predict depths+normals"
+
+[tasks.app]
+cmd = """
+    python tools/app.py
+    """
+description = "Runs Gradio frontend for depth comparison"
 [dependencies]
 python = "3.10.*"
 pip = "24.*"
