@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from jaxtyping import Float, UInt8
 from timeit import default_timer as timer
-from monopriors.relative_depth_models.base_depth import (
+from monopriors.relative_depth_models.base_relative_depth import (
     RelativeDepthPrediction,
     BaseRelativePredictor,
 )
@@ -27,14 +27,18 @@ class UniDepthPredictor(BaseRelativePredictor):
         super().__init__()
         print("Loading UniDepth model...")
         start = timer()
-        self.model = torch.hub.load(
-            "lpiccinelli-eth/UniDepth",
-            "UniDepth",
-            version=version,
-            backbone=backbone,
-            pretrained=True,
-            trust_repo=True,
-        ).to(device)
+        self.model = (
+            torch.hub.load(
+                "lpiccinelli-eth/UniDepth",
+                "UniDepth",
+                version=version,
+                backbone=backbone,
+                pretrained=True,
+                trust_repo=True,
+            )
+            .to(device)
+            .eval()
+        )
         print(f"UniDepth model loaded. Time: {timer() - start:.2f}s")
 
     def __call__(

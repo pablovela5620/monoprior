@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from jaxtyping import Float, UInt8
+from typing import Literal
 import numpy as np
 
 
@@ -22,3 +23,6 @@ class BaseRelativePredictor(ABC):
         self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
     ) -> RelativeDepthPrediction:
         raise NotImplementedError
+
+    def set_model_device(self, device: Literal["cpu", "cuda"] = "cuda") -> None:
+        self.model.to(device)

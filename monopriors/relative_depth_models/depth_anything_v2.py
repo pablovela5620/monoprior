@@ -7,7 +7,7 @@ from huggingface_hub import hf_hub_download
 from monopriors.third_party.depth_anything_v2.dpt import DepthAnythingV2
 import cv2
 from jaxtyping import Float32
-from .base_depth import RelativeDepthPrediction, BaseRelativePredictor
+from .base_relative_depth import RelativeDepthPrediction, BaseRelativePredictor
 
 model_configs = {
     "vits": {
@@ -31,7 +31,7 @@ model_configs = {
         "out_channels": [1536, 1536, 1536, 1536],
     },
 }
-encoder2name = {
+encoder2name: dict[str, str] = {
     "vits": "Small",
     "vitb": "Base",
     "vitl": "Large",
@@ -58,12 +58,12 @@ def estimate_intrinsics(
 def disparity_to_depth(
     disparity: Float32[np.ndarray, "h w"], focal_length: int, baseline: float = 1.0
 ) -> Float32[np.ndarray, "h w"]:
-    range1: float = np.minimum(disparity.max() / (disparity.min() + 1e-6), 100.0)
-    max1: float = disparity.max()
-    min1: float = max1 / range1
+    range: float = float(np.minimum(disparity.max() / (disparity.min() + 1e-6), 100.0))
+    disparity_max: float = float(disparity.max())
+    min_disparity_range: float = disparity_max / range
 
     depth: Float32[np.ndarray, "h w"] = (focal_length * baseline) / np.maximum(
-        disparity, min1
+        disparity, min_disparity_range
     )
     # gamma correction for better visualizationg
     depth: Float32[np.ndarray, "h w"] = np.power(depth, 1.0 / 2.2)
@@ -93,7 +93,7 @@ class DepthAnythingV2Predictor(BaseRelativePredictor):
 
     def __call__(
         self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
-    ) -> RelativeDepthPrediction:  # noqa: F722
+    ) -> RelativeDepthPrediction:
         # requires bgr not rgb
         bgr: UInt8[np.ndarray, "h w 3"] = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
         disparity: Float32[np.ndarray, "h w"] = self.model.infer_image(bgr)
@@ -103,7 +103,7 @@ class DepthAnythingV2Predictor(BaseRelativePredictor):
 
         relative_prediction = RelativeDepthPrediction(
             disparity=disparity,
-            depth=disparity_to_depth(disparity, focal_length=K_33[0, 0]),
+            depth=disparity_to_depth(disparity, focal_length=int(K_33[0, 0])),
             confidence=np.ones_like(disparity),
             K_33=K_33,
         )
