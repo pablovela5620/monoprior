@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 import rerun as rr
 from pathlib import Path
 from PIL import Image
-from monopriors.monoprior import DsineAndUnidepth, MonoPriorPrediction
+from monopriors.monoprior_models import DsineAndUnidepth, MonoPriorPrediction
 import numpy as np
 from monopriors.data.polycam_data import load_raw_polycam_data, PolycamCameraData
 from monopriors.depth_fuser import Open3DFuser
@@ -50,7 +50,7 @@ def log_mono_pred(
         rr.log(f"{pinhole_path}/normal_conf_np", rr.DepthImage(normal_conf_np))
 
     rr.log(f"{pinhole_path}/image", rr.Image(rgb))
-    rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_np, meter=1000))
+    rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_np.squeeze(), meter=1.0))
     rr.log(f"{pinhole_path}/normal", rr.Image(normal_np))
     if gt_depth is not None:
         rr.log(f"{pinhole_path}/gt_depth", rr.DepthImage(gt_depth, meter=1000))

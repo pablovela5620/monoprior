@@ -6,7 +6,7 @@ from typing import get_args
 
 # from monopriors.depth_models import UniDepthPredictor
 from monopriors.relative_depth_models import (
-    get_predictor,
+    get_relative_predictor,
     RelativeDepthPrediction,
     RELATIVE_PREDICTORS,
 )
@@ -21,7 +21,7 @@ def relative_depth_from_img(
     bgr_hw3 = cv2.imread(str(image_path))
     rgb_hw3 = cv2.cvtColor(bgr_hw3, cv2.COLOR_BGR2RGB)
 
-    predictor: BaseRelativePredictor = get_predictor(depth_predictor_name)(
+    predictor: BaseRelativePredictor = get_relative_predictor(depth_predictor_name)(
         device="cuda"
     )
     relative_pred: RelativeDepthPrediction = predictor.__call__(rgb=rgb_hw3, K_33=None)

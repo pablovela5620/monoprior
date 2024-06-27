@@ -3,21 +3,14 @@ import torch
 import numpy as np
 from jaxtyping import Float, UInt8
 from timeit import default_timer as timer
-from monopriors.relative_depth_models.base_relative_depth import (
-    RelativeDepthPrediction,
-    BaseRelativePredictor,
+from monopriors.metric_depth_models.base_metric_depth import (
+    MetricDepthPrediction,
+    BaseMetricPredictor,
 )
 from einops import rearrange
 
 
-def depth_to_disparity(
-    depth: Float[np.ndarray, "h w"], focal_length: int, baseline: float = 1.0
-) -> Float[np.ndarray, "h w"]:
-    disparity = (focal_length * baseline) / (depth + 0.01)
-    return disparity
-
-
-class UniDepthRelativePredictor(BaseRelativePredictor):
+class UniDepthMetricPredictor(BaseMetricPredictor):
     def __init__(
         self,
         device: Literal["cpu", "cuda"],
@@ -43,9 +36,9 @@ class UniDepthRelativePredictor(BaseRelativePredictor):
 
     def __call__(
         self,
-        rgb: UInt8[np.ndarray, "h w 3"],  # noqa: F722
-        K_33: Float[np.ndarray, "3 3"] | None,  # noqa: F722
-    ) -> RelativeDepthPrediction:
+        rgb: UInt8[np.ndarray, "h w 3"],
+        K_33: Float[np.ndarray, "3 3"] | None,
+    ) -> MetricDepthPrediction:
         # Load the RGB image and the normalization will be taken care of by the model
         # rgb = torch.from_numpy(rgb).permute(2, 0, 1)  # C, H, W
         rgb = rearrange(rgb, "h w c -> c h w")
@@ -57,9 +50,9 @@ class UniDepthRelativePredictor(BaseRelativePredictor):
             K_33 = torch.from_numpy(K_33)
             predictions = self.model.infer(rgb, K_33)
 
-        depth_b1hw: Float[torch.Tensor, "b 1 h w"] = predictions["depth"]  # noqa: F722
-        K_b33: Float[torch.Tensor, "b 3 3"] = predictions["intrinsics"]  # noqa: F722
-        conf_b1hw: Float[torch.Tensor, "b 1 h w"] = predictions["confidence"]  # noqa: F722
+        depth_b1hw: Float[torch.Tensor, "b 1 h w"] = predictions["depth"]
+        K_b33: Float[torch.Tensor, "b 3 3"] = predictions["intrinsics"]
+        conf_b1hw: Float[torch.Tensor, "b 1 h w"] = predictions["confidence"]
 
         assert depth_b1hw.shape[0] == 1, "Batch size must be 1"
 
@@ -72,13 +65,10 @@ class UniDepthRelativePredictor(BaseRelativePredictor):
         # rearrange doesn't work here?
         K_33 = K_b33.squeeze(0).numpy(force=True)
 
-        disparity = depth_to_disparity(depth_hw, focal_length=1000)
-
-        relative_pred = RelativeDepthPrediction(
-            disparity=disparity,
-            depth=depth_hw,
+        metric_pred = MetricDepthPrediction(
+            depth_meters=depth_hw,
             confidence=conf_hw,
             K_33=K_33,
         )
 
-        return relative_pred
+        return metric_pred

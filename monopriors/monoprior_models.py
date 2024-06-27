@@ -5,8 +5,9 @@ import numpy as np
 from dataclasses import dataclass
 from jaxtyping import Float, UInt8
 from monopriors.normal_models import DSineNormalPredictor, OmniNormalPredictor
-from monopriors.depth_models import UniDepthPredictor
-from icecream import ic
+
+# from monopriors.depth_models import UniDepthPredictor
+from monopriors.metric_depth_models import get_metric_predictor, MetricDepthPrediction
 from einops import rearrange
 
 
@@ -60,14 +61,16 @@ class MonoPriorModel(ABC):
         )
 
     @abstractmethod
-    def __call__(self, rgb, K_33) -> MonoPriorPrediction:
-        pass
+    def __call__(
+        self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
+    ) -> MonoPriorPrediction:
+        raise NotImplementedError
 
 
 class DsineAndUnidepth(MonoPriorModel):
     def __init__(self) -> None:
         super().__init__()
-        self.depth_model = UniDepthPredictor(device=self.device)
+        self.depth_model = get_metric_predictor("Metric3DPredictor")(device=self.device)
         self.surface_model = DSineNormalPredictor(device=self.device)
 
     def __call__(
@@ -78,7 +81,18 @@ class DsineAndUnidepth(MonoPriorModel):
         depth_b1hw: Float[torch.Tensor, "b 1 h w"]
         K_b33: Float[torch.Tensor, "b 3 3"]
 
-        depth_b1hw, K_b33, depth_conf_b1hw = self.depth_model(rgb, K_33)
+        metric_pred: MetricDepthPrediction = self.depth_model.__call__(rgb, K_33)
+        depth_b1hw = torch.from_numpy(
+            rearrange(metric_pred.depth_meters, "h w -> 1 1 h w")
+        )
+        depth_conf_b1hw = torch.from_numpy(
+            rearrange(metric_pred.confidence, "h w -> 1 1 h w")
+        )
+        K_b33 = (
+            torch.from_numpy(rearrange(metric_pred.K_33, "r c -> 1 r c"))
+            if K_33 is not None
+            else K_33
+        )
         # use depth_model intrinsics for surface_model if not provided
         if K_33 is None:
             K_33 = rearrange(K_b33, "b r c -> r c").numpy(force=True)

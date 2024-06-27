@@ -13,8 +13,8 @@ import torch
 from monopriors.relative_depth_models import (
     DepthAnythingV2Predictor,
     RelativeDepthPrediction,
-    UniDepthPredictor,
-    get_predictor,
+    UniDepthRelativePredictor,
+    get_relative_predictor,
     RELATIVE_PREDICTORS,
 )
 from monopriors.relative_depth_models.base_relative_depth import BaseRelativePredictor
@@ -39,7 +39,7 @@ DEVICE: Literal["cuda"] | Literal["cpu"] = (
 )
 if gr.NO_RELOAD:
     MODEL_1 = DepthAnythingV2Predictor(device=DEVICE)
-    MODEL_2 = UniDepthPredictor(device=DEVICE)
+    MODEL_2 = UniDepthRelativePredictor(device=DEVICE)
 
 
 def predict_depth(
@@ -74,7 +74,7 @@ def load_models(
     loaded_models = []
 
     for model in models:
-        loaded_models.append(get_predictor(model)(device=DEVICE))
+        loaded_models.append(get_relative_predictor(model)(device=DEVICE))
 
         progress(0.5, desc=f"Loaded {model}")
 

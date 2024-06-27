@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from monopriors.data.nerfstudio_data import load_nerfstudio_from_json
 from monopriors.data.sdfstudio_data import SDFStudioFrame, SceneBox, SDFStudioData
-from monopriors.monoprior import DsineAndUnidepth, MonoPriorPrediction
+from monopriors.monoprior_models import DsineAndUnidepth, MonoPriorPrediction
 import rerun as rr
 from icecream import ic
 from jaxtyping import Bool, Float64
@@ -94,7 +94,7 @@ def main(
     world_T_cam_cv_b44 = np.array(world_T_cam_cv_44_list)
     K_b33 = np.array(K_33_list)
 
-    valid_poses: Bool[np.ndarray, "b"] = (
+    valid_poses: Bool[np.ndarray, ""] = (
         np.isfinite(world_T_cam_cv_b44).all(axis=2).all(axis=1)
     )
     min_vertices: Float64[np.ndarray, "3"] = world_T_cam_cv_b44[:, :3, 3][

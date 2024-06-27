@@ -3,39 +3,16 @@ import torch
 import numpy as np
 from jaxtyping import Float, UInt8, Float32
 from timeit import default_timer as timer
-from monopriors.relative_depth_models.base_relative_depth import (
-    RelativeDepthPrediction,
-    BaseRelativePredictor,
+from monopriors.metric_depth_models.base_metric_depth import (
+    MetricDepthPrediction,
+    BaseMetricPredictor,
 )
 from einops import rearrange
 import cv2
 from typing import TypedDict
 
 
-def depth_to_disparity(
-    depth: Float[np.ndarray, "h w"], focal_length: int, baseline: float = 1.0
-) -> Float[np.ndarray, "h w"]:
-    disparity = (focal_length * baseline) / (depth + 0.01)
-    return disparity
-
-
-def estimate_intrinsics(
-    H: int, W: int, fov: float = 55.0
-) -> Float32[np.ndarray, "3 3"]:
-    """
-    Intrinsics for a pinhole camera model from image dimensions.
-    Assume fov of 55 degrees and central principal point.
-    """
-    f = 0.5 * W / np.tan(0.5 * fov * np.pi / 180.0)
-    cx = 0.5 * W
-    cy = 0.5 * H
-    K_33: Float32[np.ndarray, "3 3"] = np.array(
-        [[f, 0, cx], [0, f, cy], [0, 0, 1]], dtype=np.float32
-    )
-    return K_33
-
-
-class Metric3DPredDict(TypedDict):
+class Metric3DPredictionDict(TypedDict):
     prediction: torch.Tensor
     predictions_list: list[torch.Tensor]
     confidence: torch.Tensor
@@ -46,10 +23,12 @@ class Metric3DPredDict(TypedDict):
     low_resolution_init: torch.Tensor
 
 
-class Metric3DRelativePredictor(BaseRelativePredictor):
+class Metric3DPredictor(BaseMetricPredictor):
     def __init__(
         self,
         device: Literal["cpu", "cuda"],
+        version: Literal["v1", "v2"] = "v2",
+        backbone: Literal["vits14", "vitl14"] = "vitl14",
     ):
         super().__init__()
         self.device = device
@@ -72,7 +51,8 @@ class Metric3DRelativePredictor(BaseRelativePredictor):
         self,
         rgb: UInt8[np.ndarray, "h w 3"],
         K_33: Float[np.ndarray, "3 3"] | None,
-    ) -> RelativeDepthPrediction:
+    ) -> MetricDepthPrediction:
+        assert K_33 is not None, f"To get metric depth, K_33 must be provided"
         h, w, _ = rgb.shape
         scale: float = min(self.input_height / h, self.input_width / w)
         rgb_rescaled: UInt8[np.ndarray, "_ _ 3"] = cv2.resize(
@@ -108,7 +88,7 @@ class Metric3DRelativePredictor(BaseRelativePredictor):
         with torch.no_grad():
             pred_depth_b1hw: Float32[torch.Tensor, "b 1 616 1064"]
             confidence_b1hw: Float32[torch.Tensor, "b 1 616 1064"]
-            output_dict: Metric3DPredDict
+            output_dict: Metric3DPredictionDict
             pred_depth_b1hw, confidence_b1hw, output_dict = self.model.inference(
                 {"input": rgb_tensor_bchw}
             )
@@ -127,6 +107,7 @@ class Metric3DRelativePredictor(BaseRelativePredictor):
             rearrange(pred_depth_hw, "h w -> 1 1 h w"), (h, w), mode="bilinear"
         )
         pred_depth_hw = rearrange(pred_depth_bchw, "1 1 h w -> h w")
+        pred_depth_hw = pred_depth_hw.numpy(force=True)
 
         # confidence_b1hw: Float32[torch.Tensor, "b 1 h w"] = (
         #     torch.nn.functional.interpolate(confidence_b1hw, (h, w), mode="bilinear")
@@ -138,26 +119,18 @@ class Metric3DRelativePredictor(BaseRelativePredictor):
 
         # #### de-canonical transform
         # 1000.0 is the focal length of canonical camera
-        if k33_rescaled is not None:
-            canonical_to_real_scale = k33_rescaled[0, 0] / 1000.0
-            # now the depth is metric
-            pred_depth_metric_hw = pred_depth_hw * canonical_to_real_scale
-            pred_depth_metric_hw = torch.clamp(pred_depth_metric_hw, 0, 300)
-        else:
-            K_33 = estimate_intrinsics(rgb.shape[0], rgb.shape[1])
+        canonical_to_real_scale = k33_rescaled[0, 0] / 1000.0
+        # now the depth is metric
+        pred_depth_metric_hw = pred_depth_hw * canonical_to_real_scale
+        pred_depth_metric_hw = np.clip(pred_depth_metric_hw, 0, 300)
 
-        pred_depth_hw = pred_depth_hw.numpy(force=True)
-        disparity = depth_to_disparity(pred_depth_hw, focal_length=int(K_33[0, 0]))
-
-        relative_pred = RelativeDepthPrediction(
-            disparity=disparity,
-            depth=pred_depth_hw,
-            # TODO add confidence
-            confidence=np.ones_like(pred_depth_hw),
-            K_33=K_33,
+        metric_pred = MetricDepthPrediction(
+            depth_meters=pred_depth_metric_hw,
+            confidence=np.ones_like(pred_depth_metric_hw),
+            K_33=k33_rescaled,
         )
 
-        return relative_pred
+        return metric_pred
 
     def pad_rgb(
         self, rgb_resized: UInt8[np.ndarray, "_ _ 3"]
