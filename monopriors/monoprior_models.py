@@ -77,8 +77,10 @@ class MonoPriorModel(ABC):
 class DsineAndUnidepth(MonoPriorModel):
     def __init__(self) -> None:
         super().__init__()
-        self.depth_model = get_metric_predictor("Metric3DPredictor")(device=self.device)
-        self.surface_model = get_normal_predictor("DSineNormalPredictor")(
+        self.depth_model = get_metric_predictor("UniDepthMetricPredictor")(
+            device=self.device
+        )
+        self.surface_model = get_normal_predictor("OmniNormalPredictor")(
             device=self.device
         )
 

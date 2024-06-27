@@ -14,12 +14,8 @@ from einops import rearrange
 
 class OmniNormalPredictor(BaseNormalPredictor):
     def __init__(
-        self,
-        device: Literal["cpu", "cuda"],
-        omnidata_pretrained_weights_path: Path = Path(
-            "/home/pablo/0Dev/personal/forked-repos/dn-splatter/omnidata_ckpt"
-        ),
-    ):
+        self, device: Literal["cpu", "cuda"], omnidata_pretrained_weights_path: Path
+    ) -> None:
         self.device = device
         self.model = self._load_model(omnidata_pretrained_weights_path)
         self.image_size = 384
@@ -29,6 +25,7 @@ class OmniNormalPredictor(BaseNormalPredictor):
         omnidata_pretrained_weights_path = (
             omnidata_pretrained_weights_path / "omnidata_dpt_normal_v2.ckpt"
         )
+        assert omnidata_pretrained_weights_path.exists(), "Weights not found"
         map_location = (
             (lambda storage, loc: storage.cuda())
             if torch.cuda.is_available()
