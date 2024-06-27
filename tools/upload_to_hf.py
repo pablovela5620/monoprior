@@ -1,8 +1,9 @@
 from argparse import ArgumentParser, Namespace
 from typing import TypedDict
 import os
-from huggingface_hub import upload_file
+from huggingface_hub import upload_file, upload_folder
 from tqdm import tqdm
+from pathlib import Path
 
 
 class FileUpload(TypedDict):
@@ -41,7 +42,14 @@ def main(upload_examples: bool) -> None:
             )
 
     if upload_examples:
-        raise NotImplementedError("Upload examples is not implemented yet")
+        examples_path = Path("examples")
+        assert examples_path.exists(), f"Examples folder {examples_path} does not exist"
+        upload_folder(
+            folder_path=str(examples_path),
+            path_in_repo=str(examples_path),
+            repo_id=space_id,
+            repo_type="space",
+        )
 
 
 if __name__ == "__main__":
