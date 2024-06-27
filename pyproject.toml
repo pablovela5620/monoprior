@@ -14,6 +14,7 @@ dependencies = [
     "gradio",
     "gradio-rerun>= 0.0.3",
     "hf-transfer",
+    "mmcv",
 
 ]
 
@@ -38,7 +39,6 @@ scripts = [".pixi.sh"]
 
 [tool.pixi.tasks]
 _install-wheel = "python -m pip install $WHL_PATH --force-reinstall"
-_install-editable = "python -m pip install -e ."
 build-wheel = "python -m pip install build && python -m build"
 
 [tool.pixi.tasks.download-example]
@@ -66,7 +66,6 @@ cmd = """
     python tools/gradio_app.py
     """
 description = "Runs Gradio frontend for depth comparison"
-depends_on = ["_install-editable"]
 
 [tool.pixi.feature.spaces.tasks.app]
 cmd = """
