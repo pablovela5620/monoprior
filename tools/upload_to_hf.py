@@ -10,6 +10,7 @@ class FileUpload(TypedDict):
 
 space_id: str | None = os.environ.get("SPACE_ID")
 whl_path: str | None = os.environ.get("WHL_PATH")
+
 assert space_id is not None, "Please set the SPACE_ID environment variable"
 assert whl_path is not None, "Please set the WHL_PATH environment variable"
 
