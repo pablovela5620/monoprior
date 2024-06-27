@@ -58,7 +58,7 @@ cmd = """
     python tools/inference_polycam.py \
     --zip-path data/example-room-scan-poly.zip
     """
-depends_on = ["download-example", "_install-editable"]
+depends_on = ["download-example"]
 description = "Runs inference on polycam dataset on downloaded example, this will predict depths+normals"
 
 [tool.pixi.tasks.app]
