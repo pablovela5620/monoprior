@@ -45,9 +45,12 @@ if gr.NO_RELOAD:
 def predict_depth(
     model: BaseRelativePredictor, rgb: UInt8[np.ndarray, "h w 3"]
 ) -> RelativeDepthPrediction:
-    model.set_model_device(device=DEVICE)
-    relative_pred: RelativeDepthPrediction = model(rgb, None)
-    return relative_pred
+    try:
+        model.set_model_device(device=DEVICE)
+        relative_pred: RelativeDepthPrediction = model(rgb, None)
+        return relative_pred
+    except Exception as e:
+        raise gr.Error(f"Error with model {model.__class__.__name__}: {e}")
 
 
 if IN_SPACES:
@@ -128,13 +131,11 @@ with gr.Blocks() as demo:
                     choices=list(get_args(RELATIVE_PREDICTORS)),
                     label="Model1",
                     value="DepthAnythingV2Predictor",
-                    interactive=True,
                 )
                 model_2_dropdown = gr.Dropdown(
                     choices=list(get_args(RELATIVE_PREDICTORS)),
                     label="Model2",
                     value="UniDepthPredictor",
-                    interactive=True,
                 )
             model_status = gr.Textbox(
                 label="Model Status",
