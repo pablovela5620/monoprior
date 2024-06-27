@@ -25,6 +25,7 @@ def relative_depth_from_img(
         device="cuda"
     )
     relative_pred: RelativeDepthPrediction = predictor.__call__(rgb=rgb_hw3, K_33=None)
+    rr.log(f"{parent_log_path}", rr.ViewCoordinates.RDF, timeless=True)
     log_relative_pred(parent_log_path, relative_pred, rgb_hw3)
 
 
