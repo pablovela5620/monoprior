@@ -105,11 +105,11 @@ class DSineNormalPredictor(NormalPredictor):
             normal_list: list[torch.Tensor] = self.model(rgb, intrins=K_b33)
             # last value in the list is the normal map
             normal_bchw: (
-                Float[torch.Tensor, "b 3 h-t w-l"] | Float[torch.Tensor, "b 4 h-t w-l"]
+                Float[torch.Tensor, "b 3 _ _"] | Float[torch.Tensor, "b 4 _ _"]
             ) = normal_list[-1]
             # undo padding
             normal_bchw: (
-                Float[torch.Tensor, "b 3 h-t w-l"] | Float[torch.Tensor, "b 4 h-t w-l"]
+                Float[torch.Tensor, "b 3 _ _"] | Float[torch.Tensor, "b 4 _ _"]
             ) = normal_bchw[:, :, top : top + h, left : left + w]
 
             normal_b3hw: Float[torch.Tensor, "b 3 h w"]

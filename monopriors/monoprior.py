@@ -55,7 +55,9 @@ class MonoPriorPrediction:
 
 class MonoPriorModel(ABC):
     def __init__(self) -> None:
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device: Literal["cuda", "cpu"] = (
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
 
     @abstractmethod
     def __call__(self, rgb, K_33) -> MonoPriorPrediction:
