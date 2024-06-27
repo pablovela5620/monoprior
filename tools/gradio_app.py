@@ -15,7 +15,7 @@ from monopriors.relative_depth_models import (
     RelativeDepthPrediction,
     UniDepthPredictor,
     get_predictor,
-    AVAILABLE_PREDICTORS,
+    RELATIVE_PREDICTORS,
 )
 from monopriors.relative_depth_models.base_relative_depth import BaseRelativePredictor
 from monopriors.rr_logging_utils import (
@@ -55,8 +55,8 @@ if IN_SPACES:
 
 
 def load_models(
-    model_1: AVAILABLE_PREDICTORS,
-    model_2: AVAILABLE_PREDICTORS,
+    model_1: RELATIVE_PREDICTORS,
+    model_2: RELATIVE_PREDICTORS,
     progress=gr.Progress(),
 ) -> Literal["Models loaded"]:
     global MODEL_1, MODEL_2
@@ -125,13 +125,13 @@ with gr.Blocks() as demo:
             )
             with gr.Row():
                 model_1_dropdown = gr.Dropdown(
-                    choices=list(get_args(AVAILABLE_PREDICTORS)),
+                    choices=list(get_args(RELATIVE_PREDICTORS)),
                     label="Model1",
                     value="DepthAnythingV2Predictor",
                     interactive=True,
                 )
                 model_2_dropdown = gr.Dropdown(
-                    choices=list(get_args(AVAILABLE_PREDICTORS)),
+                    choices=list(get_args(RELATIVE_PREDICTORS)),
                     label="Model2",
                     value="UniDepthPredictor",
                     interactive=True,

@@ -5,18 +5,18 @@ from .metric3d_relative import Metric3DPredictor
 from typing import Literal, get_args, Callable
 
 # Define predictor names as a list of strings
-AVAILABLE_PREDICTORS = Literal[
+RELATIVE_PREDICTORS = Literal[
     "UniDepthPredictor", "DepthAnythingV2Predictor", "Metric3DPredictor"
 ]
 
 # Use the list to generate the __all__ list
-__all__: list[str] = list(get_args(AVAILABLE_PREDICTORS)) + [
+__all__: list[str] = list(get_args(RELATIVE_PREDICTORS)) + [
     "RelativeDepthPrediction",
 ]
 
 
 def get_predictor(
-    predictor_type: AVAILABLE_PREDICTORS,
+    predictor_type: RELATIVE_PREDICTORS,
 ) -> Callable[..., BaseRelativePredictor]:
     match predictor_type:
         case "UniDepthPredictor":

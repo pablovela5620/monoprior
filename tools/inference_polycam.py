@@ -65,7 +65,7 @@ def extract_zip(zip_path: Path, extract_dir: Path) -> None:
         zip_ref.extractall(extract_dir)
 
 
-def main(zip_path: Path):
+def main(zip_path: Path) -> None:
     extract_dir: Path = zip_path.parent / zip_path.stem
 
     if zip_path.is_file() and zip_path.exists() and (not extract_dir.exists()):

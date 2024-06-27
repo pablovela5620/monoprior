@@ -8,14 +8,14 @@ from typing import get_args
 from monopriors.relative_depth_models import (
     get_predictor,
     RelativeDepthPrediction,
-    AVAILABLE_PREDICTORS,
+    RELATIVE_PREDICTORS,
 )
 from monopriors.relative_depth_models.base_relative_depth import BaseRelativePredictor
 from monopriors.rr_logging_utils import log_relative_pred
 
 
 def relative_depth_from_img(
-    image_path: Path, depth_predictor_name: AVAILABLE_PREDICTORS
+    image_path: Path, depth_predictor_name: RELATIVE_PREDICTORS
 ) -> None:
     parent_log_path = Path("world")
     bgr_hw3 = cv2.imread(str(image_path))
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     parser.add_argument("--image-path", type=Path, default="data/39703866203.jpg")
     parser.add_argument(
         "--depth-predictor-name",
-        choices=get_args(AVAILABLE_PREDICTORS),
+        choices=get_args(RELATIVE_PREDICTORS),
         default="DepthAnythingV2Predictor",
     )
     rr.script_add_args(parser)
