@@ -37,9 +37,9 @@ libc = { family = "glibc", version = "2.31" }
 scripts = [".pixi.sh"]
 
 [tool.pixi.tasks]
-_install-wheel = "python -m pip install mini_monopriors-0.1.0-py3-none-any.whl"
+_install-wheel = "python -m pip install $WHL_PATH --force-reinstall"
 _install-editable = "python -m pip install -e ."
-_build-wheel = "python -m pip install build && python -m build"
+build-wheel = "python -m pip install build && python -m build"
 
 [tool.pixi.tasks.download-example]
 cmd = """
@@ -97,6 +97,9 @@ jupyterlab = ">=4.2.0,<4.3"
 rerun-sdk = ">=0.16.1,<0.17"
 numpy = "<2.0.0"
 beartype = ">=0.18.5,<0.19"
+
+[tool.pixi.pypi-dependencies]
+monopriors = { path = ".", editable = true }
 
 [tool.pixi.feature.spaces.pypi-dependencies]
 spaces = "*"
