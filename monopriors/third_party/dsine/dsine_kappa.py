@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from monopriors.dsine.submodules import (
+from .submodules import (
     Encoder,
     UpSampleBN,
     UpSampleGN,
@@ -17,14 +17,14 @@ from monopriors.dsine.submodules import (
     upsample_via_mask,
     get_prediction_head,
 )
-from monopriors.dsine.submodules import (
+from .submodules import (
     normal_activation,
     get_pixel_coords,
     ConvGRU,
     get_unfold,
     RayReLU,
 )
-from monopriors.dsine.utils.rotation import axis_angle_to_matrix
+from .utils.rotation import axis_angle_to_matrix
 
 
 class DSINE_v02_kappa(nn.Module):

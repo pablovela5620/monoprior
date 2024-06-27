@@ -1,4 +1,3 @@
-from pathlib import Path
 import os
 from typing import Literal
 import torch
@@ -6,24 +5,17 @@ import numpy as np
 from jaxtyping import Float, UInt8
 from torchvision import transforms
 import torch.nn.functional as F
-import torchvision.transforms.functional as TF
-from monopriors.dsine.dsine import DSINE
-from monopriors.dsine.dsine_kappa import DSINE_v02_kappa
-from monopriors.dsine.utils.utils import get_intrins_from_fov, pad_input
-from omnidata_tools.torch.modules.midas.dpt_depth import DPTDepthModel
-from abc import ABC, abstractmethod
+from monopriors.third_party.dsine.dsine import DSINE
+from monopriors.third_party.dsine.dsine_kappa import DSINE_v02_kappa
+from monopriors.third_party.dsine.utils.utils import get_intrins_from_fov, pad_input
+from monopriors.surface_normal_models.base_normal_model import (
+    BaseNormalPredictor,
+    SurfaceNormalPrediction,
+)
 from einops import rearrange
 
 
-class NormalPredictor(ABC):
-    @abstractmethod
-    def __call__(
-        self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
-    ) -> tuple[Float[torch.Tensor, "b 3 h w"], Float[torch.Tensor, "b 1 h w"] | None]:
-        raise NotImplementedError
-
-
-class DSineNormalPredictor(NormalPredictor):
+class DSineNormalPredictor(BaseNormalPredictor):
     def __init__(
         self,
         device: Literal["cpu", "cuda"],
@@ -75,7 +67,7 @@ class DSineNormalPredictor(NormalPredictor):
 
     def __call__(
         self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
-    ) -> tuple[Float[torch.Tensor, "b 3 h w"], Float[torch.Tensor, "b 1 h w"] | None]:
+    ) -> SurfaceNormalPrediction:
         # preprocess the input image
         rgb: Float[np.ndarray, "h w 3"] = rgb.astype(np.float32) / 255.0
         rgb: Float[torch.Tensor, "1 c h w"] = torch.from_numpy(
@@ -93,7 +85,7 @@ class DSineNormalPredictor(NormalPredictor):
             K_33: Float[torch.Tensor, "3 3"] = get_intrins_from_fov(
                 new_fov=60.0, H=h, W=w, device=self.device
             )
-            K_b33 = rearrange(K_33, "r c -> 1 r c")
+            K_b33: Float[torch.Tensor, "b 3 3"] = rearrange(K_33, "r c -> 1 r c")
         else:
             K_b33 = torch.from_numpy(rearrange(K_33, "r c -> 1 r c")).to(self.device)
 
@@ -118,64 +110,9 @@ class DSineNormalPredictor(NormalPredictor):
             normal_b3hw, conf_b1hw = normal_bchw[:, :3, :, :], normal_bchw[:, 3:, :, :]
             conf_b1hw = None if conf_b1hw.size(1) == 0 else conf_b1hw
 
-        return normal_b3hw, conf_b1hw
-
-
-class OmniNormalPredictor(NormalPredictor):
-    def __init__(
-        self,
-        device: Literal["cpu", "cuda"],
-        omnidata_pretrained_weights_path: Path = Path(
-            "/home/pablo/0Dev/personal/forked-repos/dn-splatter/omnidata_ckpt"
-        ),
-    ):
-        self.device = device
-        self.model = self._load_model(omnidata_pretrained_weights_path)
-        self.image_size = 384
-
-    def _load_model(self, omnidata_pretrained_weights_path: Path):
-        model = DPTDepthModel(backbone="vitb_rn50_384", num_channels=3)  # DPT Hybrid
-        omnidata_pretrained_weights_path = (
-            omnidata_pretrained_weights_path / "omnidata_dpt_normal_v2.ckpt"
-        )
-        map_location = (
-            (lambda storage, loc: storage.cuda())
-            if torch.cuda.is_available()
-            else torch.device("cpu")
-        )
-        checkpoint = torch.load(
-            omnidata_pretrained_weights_path, map_location=map_location
+        normal_pred = SurfaceNormalPrediction(
+            normal_hw3=rearrange(normal_b3hw, "1 c h w -> h w c").numpy(force=True),
+            confidence_hw1=rearrange(conf_b1hw, "1 c h w -> h w c").numpy(force=True),
         )
 
-        if "state_dict" in checkpoint:
-            state_dict = {}
-            for k, v in checkpoint["state_dict"].items():
-                state_dict[k[6:]] = v
-        else:
-            state_dict = checkpoint
-
-        model.load_state_dict(state_dict)
-        model.to(self.device)
-        return model
-
-    def __call__(
-        self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
-    ) -> tuple[Float[torch.Tensor, "b 3 h w"], Float[torch.Tensor, "b 1 h w"] | None]:
-        rgb = rgb.astype(np.float32) / 255.0
-        img_3hw = torch.from_numpy(rgb).permute(2, 0, 1)
-        _, H, W = img_3hw.shape
-        # omnidata normal model expects 384x384 images
-        img_3hw = TF.resize(img_3hw, (self.image_size, self.image_size), antialias=None)
-        img_b3hw = img_3hw.unsqueeze(0).to(self.device)
-
-        # return normal_b3hw
-        normal_b3hw = self.model(img_b3hw).clamp(min=0, max=1)
-        normal_3hw = normal_b3hw.squeeze(0)
-        # reshape back to original size
-        if normal_3hw.shape[1] != H and normal_3hw.shape[2] != W:
-            normal_3hw = TF.resize(normal_3hw, (H, W), antialias=None)
-
-        normal_b3hw = normal_3hw.unsqueeze(0)
-        # generates normal that is between 0-1 in the OpenCV Format (RDF)
-        # no confidence map is returned from omnidata model
-        return normal_b3hw, None
+        return normal_pred

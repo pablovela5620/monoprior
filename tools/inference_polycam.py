@@ -9,8 +9,7 @@ from monopriors.depth_fuser import Open3DFuser
 import cv2
 import zipfile
 from tqdm import tqdm
-from jaxtyping import UInt8, UInt16, Float32
-from einops import rearrange
+from jaxtyping import UInt8, UInt16
 
 
 def log_mono_pred(
@@ -41,17 +40,17 @@ def log_mono_pred(
             camera_xyz=rr.ViewCoordinates.RDF,
         ),
     )
-    depth_np, normal_np, _, depth_conf_np, normal_conf_np = mono_pred.to_numpy()
-    if depth_conf_np is not None:
-        depth_np = depth_np * (depth_conf_np > 0.5)
-
-    if normal_conf_np is not None:
-        normal_conf_np = rearrange(normal_conf_np, "1 h w c -> h w c")
-        rr.log(f"{pinhole_path}/normal_conf_np", rr.DepthImage(normal_conf_np))
 
     rr.log(f"{pinhole_path}/image", rr.Image(rgb))
-    rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_np.squeeze(), meter=1.0))
-    rr.log(f"{pinhole_path}/normal", rr.Image(normal_np))
+    rr.log(
+        f"{pinhole_path}/depth",
+        rr.DepthImage(mono_pred.metric_pred.depth_meters, meter=1.0),
+    )
+    rr.log(f"{pinhole_path}/normal", rr.Image(mono_pred.normal_pred.normal_hw3))
+    rr.log(
+        f"{pinhole_path}/normal_conf",
+        rr.DepthImage(mono_pred.normal_pred.confidence_hw1),
+    )
     if gt_depth is not None:
         rr.log(f"{pinhole_path}/gt_depth", rr.DepthImage(gt_depth, meter=1000))
         # diff_depth_l1 = np.abs((depth_np.squeeze() - gt_depth))
@@ -121,18 +120,17 @@ def main(zip_path: Path) -> None:
 
         cam_data: PolycamCameraData = load_raw_polycam_data(camera_path)
 
-        pred: MonoPriorPrediction = model(rgb_hw3, cam_data.K_33)
-        depth_np_bhw1: Float32[np.ndarray, "b h w 1"]
-        normal_np_bhw3: Float32[np.ndarray, "b h w 3"]
-        depth_np_bhw1, normal_np_bhw3, _, _, _ = pred.to_numpy()
-        depth_np_bhw1: UInt16[np.ndarray, "b h w 1"] = (depth_np_bhw1 * 1000).astype(
-            np.uint16
-        )  # convert to mm and Uint16
+        pred: MonoPriorPrediction = model.__call__(rgb_hw3, cam_data.K_33)
+        # convert to mm and Uint16
+        depth_hw1: UInt16[np.ndarray, "h w 1"] = (
+            pred.metric_pred.depth_meters * 1000
+        ).astype(np.uint16)
+
         gt_fuser.fuse_frames(
             gt_depth_hw, cam_data.K_33, cam_data.cam_T_world_44, rgb_hw3
         )
         pred_fuser.fuse_frames(
-            depth_np_bhw1.squeeze(), cam_data.K_33, cam_data.cam_T_world_44, rgb_hw3
+            depth_hw1.squeeze(), cam_data.K_33, cam_data.cam_T_world_44, rgb_hw3
         )
 
         log_mono_pred(

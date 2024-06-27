@@ -4,15 +4,16 @@ import torch
 import numpy as np
 from dataclasses import dataclass
 from jaxtyping import Float, UInt8
-from monopriors.normal_models import DSineNormalPredictor, OmniNormalPredictor
-
-# from monopriors.depth_models import UniDepthPredictor
+from monopriors.surface_normal_models import (
+    get_normal_predictor,
+    SurfaceNormalPrediction,
+)
 from monopriors.metric_depth_models import get_metric_predictor, MetricDepthPrediction
 from einops import rearrange
 
 
 @dataclass
-class MonoPriorPrediction:
+class OldMonoPriorPrediction:
     depth_b1hw: Float[torch.Tensor, "b 1 h w"]
     normal_b3hw: Float[torch.Tensor, "b 3 h w"]
     K_b33: Float[torch.Tensor, "b 3 3"] | None = None
@@ -54,6 +55,12 @@ class MonoPriorPrediction:
         )
 
 
+@dataclass
+class MonoPriorPrediction:
+    metric_pred: MetricDepthPrediction
+    normal_pred: SurfaceNormalPrediction
+
+
 class MonoPriorModel(ABC):
     def __init__(self) -> None:
         self.device: Literal["cuda", "cpu"] = (
@@ -71,38 +78,16 @@ class DsineAndUnidepth(MonoPriorModel):
     def __init__(self) -> None:
         super().__init__()
         self.depth_model = get_metric_predictor("Metric3DPredictor")(device=self.device)
-        self.surface_model = DSineNormalPredictor(device=self.device)
+        self.surface_model = get_normal_predictor("DSineNormalPredictor")(
+            device=self.device
+        )
 
     def __call__(
         self,
         rgb: UInt8[np.ndarray, "h w 3"],
         K_33: Float[np.ndarray, "3 3"] | None = None,
     ) -> MonoPriorPrediction:
-        depth_b1hw: Float[torch.Tensor, "b 1 h w"]
-        K_b33: Float[torch.Tensor, "b 3 3"]
-
         metric_pred: MetricDepthPrediction = self.depth_model.__call__(rgb, K_33)
-        depth_b1hw = torch.from_numpy(
-            rearrange(metric_pred.depth_meters, "h w -> 1 1 h w")
-        )
-        depth_conf_b1hw = torch.from_numpy(
-            rearrange(metric_pred.confidence, "h w -> 1 1 h w")
-        )
-        K_b33 = (
-            torch.from_numpy(rearrange(metric_pred.K_33, "r c -> 1 r c"))
-            if K_33 is not None
-            else K_33
-        )
-        # use depth_model intrinsics for surface_model if not provided
-        if K_33 is None:
-            K_33 = rearrange(K_b33, "b r c -> r c").numpy(force=True)
+        normal_pred: SurfaceNormalPrediction = self.surface_model(rgb, K_33)
 
-        normal_b3hw, normal_conf_b1hw = self.surface_model(rgb, K_33)
-        prediction = MonoPriorPrediction(
-            depth_b1hw=depth_b1hw,
-            normal_b3hw=normal_b3hw,
-            K_b33=K_b33,
-            depth_conf_b1hw=depth_conf_b1hw,
-            normal_conf_b1hw=normal_conf_b1hw,
-        )
-        return prediction
+        return MonoPriorPrediction(metric_pred=metric_pred, normal_pred=normal_pred)

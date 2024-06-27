@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from monopriors.data.nerfstudio_data import load_nerfstudio_from_json
 from monopriors.data.sdfstudio_data import SDFStudioFrame, SceneBox, SDFStudioData
-from monopriors.monoprior_models import DsineAndUnidepth, MonoPriorPrediction
+from monopriors.monoprior_models import DsineAndUnidepth, OldMonoPriorPrediction
 import rerun as rr
 from icecream import ic
 from jaxtyping import Bool, Float64
@@ -141,7 +141,7 @@ def main(
         # img.save(target_image)
 
         K_33 = K_b33[idx]
-        pred: MonoPriorPrediction = model(rgb, K_33.astype(np.float32))
+        pred: OldMonoPriorPrediction = model(rgb, K_33.astype(np.float32))
         depth_np_bhw1, normal_np_bhw3, _ = pred.to_numpy()
 
         # convert to normalized like omnidata (this is what nerfstudio accepts)
