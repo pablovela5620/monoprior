@@ -1,5 +1,24 @@
-from .base_relative_depth import RelativeDepthPrediction
+from .base_relative_depth import RelativeDepthPrediction, BaseRelativePredictor
 from .depth_anything_v2 import DepthAnythingV2Predictor
 from .unidepth import UniDepthPredictor
+from typing import Literal, get_args, Callable
 
-__all__ = ["UniDepthPredictor", "DepthAnythingV2Predictor", "RelativeDepthPrediction"]
+# Define predictor names as a list of strings
+AVAILABLE_PREDICTORS = Literal["UniDepthPredictor", "DepthAnythingV2Predictor"]
+
+# Use the list to generate the __all__ list
+__all__: list[str] = list(get_args(AVAILABLE_PREDICTORS)) + [
+    "RelativeDepthPrediction",
+]
+
+
+def get_predictor(
+    predictor_type: AVAILABLE_PREDICTORS,
+) -> Callable[..., BaseRelativePredictor]:
+    match predictor_type:
+        case "UniDepthPredictor":
+            return UniDepthPredictor
+        case "DepthAnythingV2Predictor":
+            return DepthAnythingV2Predictor
+        case _:
+            raise ValueError(f"Unknown predictor type: {predictor_type}")

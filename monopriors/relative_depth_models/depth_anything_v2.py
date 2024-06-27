@@ -75,7 +75,7 @@ class DepthAnythingV2Predictor(BaseRelativePredictor):
         self,
         device: Literal["cpu", "cuda"],
         encoder: Literal["vits", "vitb", "vitl"] = "vitl",
-    ):
+    ) -> None:
         super().__init__()
         print("Loading DepthAnything model...")
         start = timer()
