@@ -33,7 +33,7 @@ from jaxtyping import UInt8
 title = "# Depth Comparison"
 description1 = """Demo to help compare different depth models. Including both Scale | Shift Invariant and Metric Depth types."""
 description2 = """Invariant models mean they have no true scale and are only relative, where as Metric models have a true scale and are absolute (meters)."""
-
+model_load_status: str = "Models loaded and ready to use!"
 DEVICE: Literal["cuda"] | Literal["cpu"] = (
     "cuda" if torch.cuda.is_available() else "cpu"
 )
@@ -82,7 +82,7 @@ def load_models(
     progress(1, desc="Models Loaded")
     MODEL_1, MODEL_2 = loaded_models
 
-    return "Models loaded and ready to use!"
+    return model_load_status
 
 
 @rr.thread_local_stream("depth")
@@ -142,7 +142,7 @@ with gr.Blocks() as demo:
                 )
             model_status = gr.Textbox(
                 label="Model Status",
-                value="Models loaded",
+                value=model_load_status,
                 interactive=False,
             )
 

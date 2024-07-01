@@ -480,7 +480,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/03/0a/4f6fed21aa246c6b49b561ca55facacc2a44b87d65b8b92362a8e99ba202/loguru-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/42/d7/1ec15b46af6af88f19b8e5ffea08fa375d433c998b8a7639e76935c14f1f/markdown_it_py-3.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/e9/a2/57a733e7e84985a8a0e3101dfb8170fc9db92435c16afad253069ae3f9df/mmcv-2.2.0.tar.gz
+      - pypi: https://files.pythonhosted.org/packages/59/bd/5d468c171f201d6169bec848d1116e95736854eec72307299bc68939fe45/mmcv_lite-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0b/03/e8a1da1e73d6d9ba3ada49780c0c27afcea4607539ccf9a4be75e2b08533/mmengine-0.10.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bc/f7/7ec7fddc92e50714ea3745631f79bd9c96424cb2702632521028e57d3a36/multiprocess-0.70.16-py310-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/37/6d/121efd7382d5b0284239f4ab1fc1590d86d34ed4a4a2fdb13b30ca8e5740/nvidia_cublas_cu12-12.1.3.1-py3-none-manylinux1_x86_64.whl
@@ -1013,7 +1013,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/03/0a/4f6fed21aa246c6b49b561ca55facacc2a44b87d65b8b92362a8e99ba202/loguru-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/42/d7/1ec15b46af6af88f19b8e5ffea08fa375d433c998b8a7639e76935c14f1f/markdown_it_py-3.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/e9/a2/57a733e7e84985a8a0e3101dfb8170fc9db92435c16afad253069ae3f9df/mmcv-2.2.0.tar.gz
+      - pypi: https://files.pythonhosted.org/packages/59/bd/5d468c171f201d6169bec848d1116e95736854eec72307299bc68939fe45/mmcv_lite-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0b/03/e8a1da1e73d6d9ba3ada49780c0c27afcea4607539ccf9a4be75e2b08533/mmengine-0.10.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bc/f7/7ec7fddc92e50714ea3745631f79bd9c96424cb2702632521028e57d3a36/multiprocess-0.70.16-py310-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/37/6d/121efd7382d5b0284239f4ab1fc1590d86d34ed4a4a2fdb13b30ca8e5740/nvidia_cublas_cu12-12.1.3.1-py3-none-manylinux1_x86_64.whl
@@ -7415,10 +7415,10 @@ packages:
   size: 161440193
   timestamp: 1674673370494
 - kind: pypi
-  name: mmcv
+  name: mmcv-lite
   version: 2.2.0
-  url: https://files.pythonhosted.org/packages/e9/a2/57a733e7e84985a8a0e3101dfb8170fc9db92435c16afad253069ae3f9df/mmcv-2.2.0.tar.gz
-  sha256: ac479247e808d8802f89eadf04d4118de86bdfe81361ec5aed0cc1bf731c67c9
+  url: https://files.pythonhosted.org/packages/59/bd/5d468c171f201d6169bec848d1116e95736854eec72307299bc68939fe45/mmcv_lite-2.2.0-py2.py3-none-any.whl
+  sha256: a24ee8dd3df7556dfced282dbfe8c3f87df6de2d4dcaf1207e83e9a2d58455a6
   requires_dist:
   - addict
   - mmengine>=0.3.0
@@ -7429,6 +7429,38 @@ packages:
   - yapf
   - opencv-python>=3
   - regex ; sys_platform == 'win32'
+  - pytest-runner ; extra == 'all'
+  - ninja ; extra == 'all'
+  - psutil ; extra == 'all'
+  - addict ; extra == 'all'
+  - mmengine>=0.3.0 ; extra == 'all'
+  - numpy ; extra == 'all'
+  - packaging ; extra == 'all'
+  - pillow ; extra == 'all'
+  - pyyaml ; extra == 'all'
+  - yapf ; extra == 'all'
+  - coverage ; extra == 'all'
+  - lmdb ; extra == 'all'
+  - onnx ; extra == 'all'
+  - onnxoptimizer ; extra == 'all'
+  - onnxruntime ; extra == 'all'
+  - pytest ; extra == 'all'
+  - pyturbojpeg ; extra == 'all'
+  - scipy ; extra == 'all'
+  - tifffile ; extra == 'all'
+  - regex ; sys_platform == 'win32' and extra == 'all'
+  - pytest-runner ; extra == 'build'
+  - ninja ; extra == 'optional'
+  - psutil ; extra == 'optional'
+  - coverage ; extra == 'tests'
+  - lmdb ; extra == 'tests'
+  - onnx ; extra == 'tests'
+  - onnxoptimizer ; extra == 'tests'
+  - onnxruntime ; extra == 'tests'
+  - pytest ; extra == 'tests'
+  - pyturbojpeg ; extra == 'tests'
+  - scipy ; extra == 'tests'
+  - tifffile ; extra == 'tests'
   requires_python: '>=3.7'
 - kind: pypi
   name: mmengine
@@ -7484,7 +7516,7 @@ packages:
   name: monopriors
   version: 0.1.0
   path: .
-  sha256: 619b8ad74ffc9784df8238518651eb41f39164c70f2e69740b9d77be87be1397
+  sha256: 6bdf411d12bd7f849f921b3b7c036423eb3316317f1bc5cd8203ac17d9d9f00e
   requires_dist:
   - huggingface-hub
   - opencv-python
@@ -7496,7 +7528,7 @@ packages:
   - gradio
   - gradio-rerun>=0.0.3
   - hf-transfer
-  - mmcv
+  - mmcv-lite
   editable: true
 - kind: conda
   name: mpc
