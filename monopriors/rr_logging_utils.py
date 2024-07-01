@@ -11,6 +11,7 @@ def log_relative_pred(
     parent_log_path: Path,
     relative_pred: RelativeDepthPrediction,
     rgb_hw3: UInt8[np.ndarray, "h w 3"],
+    jpeg_quality: int = 90,
 ) -> None:
     cam_log_path: Path = parent_log_path / "camera"
     pinhole_path: Path = cam_log_path / "pinhole"
@@ -35,7 +36,9 @@ def log_relative_pred(
             camera_xyz=rr.ViewCoordinates.RDF,
         ),
     )
-    rr.log(f"{pinhole_path}/image", rr.Image(rgb_hw3))
+    rr.log(
+        f"{pinhole_path}/image", rr.Image(rgb_hw3).compress(jpeg_quality=jpeg_quality)
+    )
 
     rr.log(f"{pinhole_path}/depth", rr.DepthImage(relative_pred.depth))
 
