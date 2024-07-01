@@ -45,23 +45,21 @@ if gr.NO_RELOAD:
 def predict_depth(
     model: BaseRelativePredictor, rgb: UInt8[np.ndarray, "h w 3"]
 ) -> RelativeDepthPrediction:
-    try:
-        model.set_model_device(device=DEVICE)
-        relative_pred: RelativeDepthPrediction = model(rgb, None)
-        return relative_pred
-    except Exception as e:
-        raise gr.Error(f"Error with model {model.__class__.__name__}: {e}")
+    model.set_model_device(device=DEVICE)
+    relative_pred: RelativeDepthPrediction = model(rgb, None)
+    return relative_pred
 
 
 if IN_SPACES:
     predict_depth = spaces.GPU(predict_depth)
+    # remove any model that fails on zerogpu spaces
 
 
 def load_models(
     model_1: RELATIVE_PREDICTORS,
     model_2: RELATIVE_PREDICTORS,
     progress=gr.Progress(),
-) -> Literal["Models loaded"]:
+) -> str:
     global MODEL_1, MODEL_2
     # delete the previous models and clear gpu memory
     if "MODEL_1" in globals():
@@ -84,7 +82,7 @@ def load_models(
     progress(1, desc="Models Loaded")
     MODEL_1, MODEL_2 = loaded_models
 
-    return "Models loaded"
+    return "Models loaded and ready to use!"
 
 
 @rr.thread_local_stream("depth")
@@ -93,18 +91,23 @@ def on_submit(rgb: UInt8[np.ndarray, "h w 3"]):
     models_list = [MODEL_1, MODEL_2]
     blueprint = create_depth_comparison_blueprint(models_list)
     rr.send_blueprint(blueprint)
-    for model in models_list:
-        # get the name of the model
-        parent_log_path = Path(f"{model.__class__.__name__}")
-        rr.log(f"{parent_log_path}", rr.ViewCoordinates.RDF, timeless=True)
+    try:
+        for model in models_list:
+            # get the name of the model
+            parent_log_path = Path(f"{model.__class__.__name__}")
+            rr.log(f"{parent_log_path}", rr.ViewCoordinates.RDF, timeless=True)
 
-        relative_pred: RelativeDepthPrediction = predict_depth(model, rgb)
+            relative_pred: RelativeDepthPrediction = predict_depth(model, rgb)
 
-        log_relative_pred(
-            parent_log_path=parent_log_path, relative_pred=relative_pred, rgb_hw3=rgb
-        )
+            log_relative_pred(
+                parent_log_path=parent_log_path,
+                relative_pred=relative_pred,
+                rgb_hw3=rgb,
+            )
 
-        yield stream.read()
+            yield stream.read()
+    except Exception as e:
+        raise gr.Error(f"Error with model {model.__class__.__name__}: {e}")
 
 
 with gr.Blocks() as demo:
@@ -135,7 +138,7 @@ with gr.Blocks() as demo:
                 model_2_dropdown = gr.Dropdown(
                     choices=list(get_args(RELATIVE_PREDICTORS)),
                     label="Model2",
-                    value="UniDepthPredictor",
+                    value="UniDepthRelativePredictor",
                 )
             model_status = gr.Textbox(
                 label="Model Status",
