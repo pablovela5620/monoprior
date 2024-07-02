@@ -90,7 +90,7 @@ def load_models(
 
 
 @rr.thread_local_stream("depth")
-def on_submit(rgb: UInt8[np.ndarray, "h w 3"]):
+def on_submit(rgb: UInt8[np.ndarray, "h w 3"], remove_flying_pixels: bool):
     stream: rr.BinaryStream = rr.binary_stream()
     models_list = [MODEL_1, MODEL_2]
     blueprint = create_depth_comparison_blueprint(models_list)
@@ -115,6 +115,7 @@ def on_submit(rgb: UInt8[np.ndarray, "h w 3"]):
                 parent_log_path=parent_log_path,
                 relative_pred=relative_pred,
                 rgb_hw3=rgb,
+                remove_flying_pixels=remove_flying_pixels,
             )
 
             yield stream.read()
@@ -141,6 +142,11 @@ with gr.Blocks() as demo:
                 value="Scale | Shift Invariant",
                 interactive=True,
             )
+            remove_flying_pixels = gr.Checkbox(
+                label="Remove Flying Pixels",
+                value=True,
+                interactive=True,
+            )
             with gr.Row():
                 model_1_dropdown = gr.Dropdown(
                     choices=list(get_args(RELATIVE_PREDICTORS)),
@@ -165,7 +171,7 @@ with gr.Blocks() as demo:
 
     submit.click(
         on_submit,
-        inputs=[input_image],
+        inputs=[input_image, remove_flying_pixels],
         outputs=[rr_viewer],
     )
 

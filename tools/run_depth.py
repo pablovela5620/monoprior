@@ -1,7 +1,9 @@
 from pathlib import Path
 from argparse import ArgumentParser
 import rerun as rr
+import mmcv
 import cv2
+import numpy as np
 from typing import get_args
 
 from monopriors.relative_depth_models import (
@@ -13,12 +15,23 @@ from monopriors.relative_depth_models.base_relative_depth import BaseRelativePre
 from monopriors.rr_logging_utils import log_relative_pred
 
 
+def resize_image(image: np.ndarray, max_dim: int = 1024) -> np.ndarray:
+    current_dim = max(image.shape[0], image.shape[1])
+    if current_dim > max_dim:
+        scale_factor = max_dim / current_dim
+        image = mmcv.imrescale(img=image, scale=scale_factor)
+    return image
+
+
 def relative_depth_from_img(
     image_path: Path, depth_predictor_name: RELATIVE_PREDICTORS
 ) -> None:
     parent_log_path = Path("world")
     bgr_hw3 = cv2.imread(str(image_path))
     rgb_hw3 = cv2.cvtColor(bgr_hw3, cv2.COLOR_BGR2RGB)
+
+    max_dim = 1024 // 2
+    rgb_hw3 = resize_image(rgb_hw3, max_dim)
 
     predictor: BaseRelativePredictor = get_relative_predictor(depth_predictor_name)(
         device="cuda"

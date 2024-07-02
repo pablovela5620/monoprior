@@ -7,10 +7,10 @@ from typing import Literal, get_args, Callable
 
 # Define predictor names as a list of strings
 RELATIVE_PREDICTORS = Literal[
-    "UniDepthRelativePredictor",
-    "DepthAnythingV2Predictor",
-    "Metric3DRelativePredictor",
     "DepthAnythingV1Predictor",
+    "DepthAnythingV2Predictor",
+    "UniDepthRelativePredictor",
+    "Metric3DRelativePredictor",
 ]
 
 # Use the list to generate the __all__ list

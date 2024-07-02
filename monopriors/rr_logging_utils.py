@@ -2,17 +2,18 @@ import numpy as np
 from pathlib import Path
 import rerun as rr
 import rerun.blueprint as rrb
-from jaxtyping import UInt8, Float64
+from jaxtyping import UInt8, Float64, Float32, Bool
 from monopriors.relative_depth_models import RelativeDepthPrediction
 from monopriors.relative_depth_models.base_relative_depth import BaseRelativePredictor
 from einops import rearrange
-from monopriors.depth_utils import depth_to_points
+from monopriors.depth_utils import depth_to_points, clip_disparity, depth_edges_mask
 
 
 def log_relative_pred(
     parent_log_path: Path,
     relative_pred: RelativeDepthPrediction,
     rgb_hw3: UInt8[np.ndarray, "h w 3"],
+    remove_flying_pixels: bool = True,
     jpeg_quality: int = 90,
 ) -> None:
     cam_log_path: Path = parent_log_path / "camera"
@@ -42,22 +43,25 @@ def log_relative_pred(
         f"{pinhole_path}/image", rr.Image(rgb_hw3).compress(jpeg_quality=jpeg_quality)
     )
 
-    rr.log(f"{pinhole_path}/depth", rr.DepthImage(relative_pred.depth))
+    depth_hw: Float32[np.ndarray, "h w"] = relative_pred.depth
+    if remove_flying_pixels:
+        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(depth_hw, threshold=0.1)
+        depth_hw: Float32[np.ndarray, "h w"] = depth_hw * ~edges_mask
 
-    # Get the 95th percentile of the disparity values
-    p95 = np.percentile(relative_pred.disparity, 99)
-    # Clip the disparity values at 105% of the 95th percentile
-    clipped_disparity = np.clip(relative_pred.disparity, a_min=None, a_max=1.01 * p95)
-    # normalize the disparity to 0-1
-    clipped_disparity = (clipped_disparity - clipped_disparity.min()) / (
-        clipped_disparity.max() - clipped_disparity.min()
+    rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_hw))
+
+    # removes outliers from disparity (sometimes we can get weirdly large values)
+    clipped_disparity: UInt8[np.ndarray, "h w"] = clip_disparity(
+        relative_pred.disparity
     )
-    clipped_disparity = (clipped_disparity * 255).astype(np.uint8)
+
     # log to cam_log_path to avoid backprojecting disparity
     rr.log(f"{cam_log_path}/disparity", rr.DepthImage(clipped_disparity))
 
-    depth_1hw = rearrange(relative_pred.depth, "h w -> 1 h w")
-    pts_3d = depth_to_points(depth_1hw, relative_pred.K_33)
+    depth_1hw = rearrange(depth_hw, "h w -> 1 h w")
+    pts_3d: Float32[np.ndarray, "h w 3"] = depth_to_points(
+        depth_1hw, relative_pred.K_33
+    )
 
     print(f"pts_3d.shape: {pts_3d.shape}")
 
