@@ -31,6 +31,7 @@ except ImportError:
 title = "# Depth Comparison"
 description1 = """Demo to help compare different depth models. Including both Scale | Shift Invariant and Metric Depth types."""
 description2 = """Invariant models mean they have no true scale and are only relative, where as Metric models have a true scale and are absolute (meters)."""
+description3 = """![GitHub Repo stars](https://img.shields.io/github/stars/pablovela5620/monoprior)"""
 model_load_status: str = "Models loaded and ready to use!"
 DEVICE: Literal["cuda"] | Literal["cpu"] = (
     "cuda" if torch.cuda.is_available() else "cpu"
@@ -127,6 +128,7 @@ with gr.Blocks() as demo:
     gr.Markdown(title)
     gr.Markdown(description1)
     gr.Markdown(description2)
+    gr.Markdown(description3)
     gr.Markdown("### Depth Prediction demo")
 
     with gr.Row():

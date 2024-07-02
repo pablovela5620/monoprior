@@ -58,7 +58,7 @@ def log_relative_pred(
     # log to cam_log_path to avoid backprojecting disparity
     rr.log(f"{cam_log_path}/disparity", rr.DepthImage(clipped_disparity))
 
-    depth_1hw: Float32[np.ndarray, "h w"] = rearrange(depth_hw, "h w -> 1 h w")
+    depth_1hw: Float32[np.ndarray, "1 h w"] = rearrange(depth_hw, "h w -> 1 h w")
     pts_3d: Float32[np.ndarray, "h w 3"] = depth_to_points(
         depth_1hw, relative_pred.K_33
     )
