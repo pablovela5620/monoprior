@@ -5,6 +5,8 @@ import rerun.blueprint as rrb
 from jaxtyping import UInt8, Float64
 from monopriors.relative_depth_models import RelativeDepthPrediction
 from monopriors.relative_depth_models.base_relative_depth import BaseRelativePredictor
+from einops import rearrange
+from monopriors.depth_utils import depth_to_points
 
 
 def log_relative_pred(
@@ -53,6 +55,19 @@ def log_relative_pred(
     clipped_disparity = (clipped_disparity * 255).astype(np.uint8)
     # log to cam_log_path to avoid backprojecting disparity
     rr.log(f"{cam_log_path}/disparity", rr.DepthImage(clipped_disparity))
+
+    depth_1hw = rearrange(relative_pred.depth, "h w -> 1 h w")
+    pts_3d = depth_to_points(depth_1hw, relative_pred.K_33)
+
+    print(f"pts_3d.shape: {pts_3d.shape}")
+
+    rr.log(
+        f"{parent_log_path}/point_cloud",
+        rr.Points3D(
+            positions=pts_3d.reshape(-1, 3),
+            colors=rgb_hw3.reshape(-1, 3),
+        ),
+    )
 
 
 def create_depth_comparison_blueprint(

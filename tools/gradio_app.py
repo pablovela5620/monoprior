@@ -1,19 +1,8 @@
 import gradio as gr
 import numpy as np
-
-try:
-    import spaces  # type: ignore
-
-    IN_SPACES = True
-except ImportError:
-    print("Not running on Zero")
-    IN_SPACES = False
 import torch
-
 from monopriors.relative_depth_models import (
-    DepthAnythingV2Predictor,
     RelativeDepthPrediction,
-    UniDepthRelativePredictor,
     get_relative_predictor,
     RELATIVE_PREDICTORS,
 )
@@ -29,6 +18,15 @@ from typing import Literal, get_args
 import gc
 
 from jaxtyping import UInt8
+import mmcv
+
+try:
+    import spaces  # type: ignore
+
+    IN_SPACES = True
+except ImportError:
+    print("Not running on Zero")
+    IN_SPACES = False
 
 title = "# Depth Comparison"
 description1 = """Demo to help compare different depth models. Including both Scale | Shift Invariant and Metric Depth types."""
@@ -37,9 +35,10 @@ model_load_status: str = "Models loaded and ready to use!"
 DEVICE: Literal["cuda"] | Literal["cpu"] = (
     "cuda" if torch.cuda.is_available() else "cpu"
 )
+MODELS_TO_SKIP: list[str] = []
 if gr.NO_RELOAD:
-    MODEL_1 = DepthAnythingV2Predictor(device=DEVICE)
-    MODEL_2 = UniDepthRelativePredictor(device=DEVICE)
+    MODEL_1 = get_relative_predictor("DepthAnythingV2Predictor")(device=DEVICE)
+    MODEL_2 = get_relative_predictor("UniDepthRelativePredictor")(device=DEVICE)
 
 
 def predict_depth(
@@ -53,6 +52,7 @@ def predict_depth(
 if IN_SPACES:
     predict_depth = spaces.GPU(predict_depth)
     # remove any model that fails on zerogpu spaces
+    MODELS_TO_SKIP.extend(["Metric3DRelativePredictor"])
 
 
 def load_models(
@@ -72,11 +72,15 @@ def load_models(
     progress(0, desc="Loading Models please wait...")
 
     models: list[int] = [model_1, model_2]
+    # check if the models are in the list of models to skip
+    if any(model in MODELS_TO_SKIP for model in models):
+        raise gr.Error(
+            f"Model not supported on ZeroGPU, please try another model: {MODELS_TO_SKIP}"
+        )
     loaded_models = []
 
     for model in models:
         loaded_models.append(get_relative_predictor(model)(device=DEVICE))
-
         progress(0.5, desc=f"Loaded {model}")
 
     progress(1, desc="Models Loaded")
@@ -91,6 +95,14 @@ def on_submit(rgb: UInt8[np.ndarray, "h w 3"]):
     models_list = [MODEL_1, MODEL_2]
     blueprint = create_depth_comparison_blueprint(models_list)
     rr.send_blueprint(blueprint)
+
+    # resize the image to have a max dim of 1024
+    max_dim = 1024
+    current_dim = max(rgb.shape[0], rgb.shape[1])
+    if current_dim > max_dim:
+        scale_factor = max_dim / current_dim
+        rgb = mmcv.imrescale(img=rgb, scale=scale_factor)
+
     try:
         for model in models_list:
             # get the name of the model
