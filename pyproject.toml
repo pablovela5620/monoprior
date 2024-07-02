@@ -39,7 +39,7 @@ scripts = [".pixi.sh"]
 
 [tool.pixi.tasks]
 _install-wheel = "python -m pip install $WHL_PATH --force-reinstall"
-_build-wheel = "rm -r dist && python -m pip install build && python -m build"
+_build-wheel = "python -m pip install build && python -m build"
 upload-hf = { cmd = "python tools/upload_to_hf.py", depends_on = [
     "_build-wheel",
 ] }
