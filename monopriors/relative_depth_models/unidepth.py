@@ -3,18 +3,12 @@ import torch
 import numpy as np
 from jaxtyping import Float, UInt8
 from timeit import default_timer as timer
+from monopriors.depth_utils import depth_to_disparity
 from monopriors.relative_depth_models.base_relative_depth import (
     RelativeDepthPrediction,
     BaseRelativePredictor,
 )
 from einops import rearrange
-
-
-def depth_to_disparity(
-    depth: Float[np.ndarray, "h w"], focal_length: int, baseline: float = 1.0
-) -> Float[np.ndarray, "h w"]:
-    disparity = (focal_length * baseline) / (depth + 0.01)
-    return disparity
 
 
 class UniDepthRelativePredictor(BaseRelativePredictor):

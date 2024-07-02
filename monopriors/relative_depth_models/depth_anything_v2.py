@@ -4,6 +4,7 @@ import numpy as np
 from jaxtyping import Float, UInt8
 from timeit import default_timer as timer
 from huggingface_hub import hf_hub_download
+from monopriors.depth_utils import estimate_intrinsics, disparity_to_depth
 from monopriors.third_party.depth_anything_v2.dpt import DepthAnythingV2
 import cv2
 from jaxtyping import Float32
@@ -39,37 +40,6 @@ encoder2name: dict[str, str] = {
 }
 
 
-def estimate_intrinsics(
-    H: int, W: int, fov: float = 55.0
-) -> Float32[np.ndarray, "3 3"]:
-    """
-    Intrinsics for a pinhole camera model from image dimensions.
-    Assume fov of 55 degrees and central principal point.
-    """
-    f = 0.5 * W / np.tan(0.5 * fov * np.pi / 180.0)
-    cx = 0.5 * W
-    cy = 0.5 * H
-    K_33: Float32[np.ndarray, "3 3"] = np.array(
-        [[f, 0, cx], [0, f, cy], [0, 0, 1]], dtype=np.float32
-    )
-    return K_33
-
-
-def disparity_to_depth(
-    disparity: Float32[np.ndarray, "h w"], focal_length: int, baseline: float = 1.0
-) -> Float32[np.ndarray, "h w"]:
-    range: float = float(np.minimum(disparity.max() / (disparity.min() + 1e-6), 100.0))
-    disparity_max: float = float(disparity.max())
-    min_disparity_range: float = disparity_max / range
-
-    depth: Float32[np.ndarray, "h w"] = (focal_length * baseline) / np.maximum(
-        disparity, min_disparity_range
-    )
-    # gamma correction for better visualizationg
-    depth: Float32[np.ndarray, "h w"] = np.power(depth, 1.0 / 2.2)
-    return depth
-
-
 class DepthAnythingV2Predictor(BaseRelativePredictor):
     def __init__(
         self,
@@ -77,7 +47,7 @@ class DepthAnythingV2Predictor(BaseRelativePredictor):
         encoder: Literal["vits", "vitb", "vitl"] = "vitl",
     ) -> None:
         super().__init__()
-        print("Loading DepthAnything model...")
+        print("Loading DepthAnythingV2 model...")
         start = timer()
         model_name: str = encoder2name[encoder]
         self.model = DepthAnythingV2(**model_configs[encoder])
@@ -89,7 +59,7 @@ class DepthAnythingV2Predictor(BaseRelativePredictor):
         state_dict = torch.load(filepath, map_location="cpu")
         self.model.load_state_dict(state_dict)
         self.model = self.model.to(device).eval()
-        print(f"DepthAnything model loaded. Time: {timer() - start:.2f}s")
+        print(f"DepthAnythingV2 model loaded. Time: {timer() - start:.2f}s")
 
     def __call__(
         self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None

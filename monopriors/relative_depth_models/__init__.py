@@ -1,12 +1,16 @@
 from .base_relative_depth import RelativeDepthPrediction, BaseRelativePredictor
 from .depth_anything_v2 import DepthAnythingV2Predictor
+from .depth_anything_v1 import DepthAnythingV1Predictor
 from .unidepth import UniDepthRelativePredictor
 from .metric3d_relative import Metric3DRelativePredictor
 from typing import Literal, get_args, Callable
 
 # Define predictor names as a list of strings
 RELATIVE_PREDICTORS = Literal[
-    "UniDepthRelativePredictor", "DepthAnythingV2Predictor", "Metric3DRelativePredictor"
+    "UniDepthRelativePredictor",
+    "DepthAnythingV2Predictor",
+    "Metric3DRelativePredictor",
+    "DepthAnythingV1Predictor",
 ]
 
 # Use the list to generate the __all__ list
@@ -23,6 +27,8 @@ def get_relative_predictor(
             return UniDepthRelativePredictor
         case "DepthAnythingV2Predictor":
             return DepthAnythingV2Predictor
+        case "DepthAnythingV1Predictor":
+            return DepthAnythingV1Predictor
         case "Metric3DRelativePredictor":
             return Metric3DRelativePredictor
         case _:

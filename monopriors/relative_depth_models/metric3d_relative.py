@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from jaxtyping import Float, UInt8, Float32
 from timeit import default_timer as timer
+from monopriors.depth_utils import estimate_intrinsics, depth_to_disparity
 from monopriors.relative_depth_models.base_relative_depth import (
     RelativeDepthPrediction,
     BaseRelativePredictor,
@@ -10,29 +11,6 @@ from monopriors.relative_depth_models.base_relative_depth import (
 from einops import rearrange
 import cv2
 from typing import TypedDict
-
-
-def depth_to_disparity(
-    depth: Float[np.ndarray, "h w"], focal_length: int, baseline: float = 1.0
-) -> Float[np.ndarray, "h w"]:
-    disparity = (focal_length * baseline) / (depth + 0.01)
-    return disparity
-
-
-def estimate_intrinsics(
-    H: int, W: int, fov: float = 55.0
-) -> Float32[np.ndarray, "3 3"]:
-    """
-    Intrinsics for a pinhole camera model from image dimensions.
-    Assume fov of 55 degrees and central principal point.
-    """
-    f = 0.5 * W / np.tan(0.5 * fov * np.pi / 180.0)
-    cx = 0.5 * W
-    cy = 0.5 * H
-    K_33: Float32[np.ndarray, "3 3"] = np.array(
-        [[f, 0, cx], [0, f, cy], [0, 0, 1]], dtype=np.float32
-    )
-    return K_33
 
 
 class Metric3DPredDict(TypedDict):

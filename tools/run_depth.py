@@ -4,7 +4,6 @@ import rerun as rr
 import cv2
 from typing import get_args
 
-# from monopriors.depth_models import UniDepthPredictor
 from monopriors.relative_depth_models import (
     get_relative_predictor,
     RelativeDepthPrediction,
