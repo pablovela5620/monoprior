@@ -40,7 +40,7 @@ scripts = [".pixi.sh"]
 [tool.pixi.tasks]
 _install-wheel = "python -m pip install $WHL_PATH --force-reinstall"
 build-wheel = "rm -r dist && python -m pip install build && python -m build"
-upload-hf = "pwd"
+upload-hf = "python tools/upload_to_hf.py"
 
 [tool.pixi.tasks.download-example]
 cmd = """
