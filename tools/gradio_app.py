@@ -9,7 +9,7 @@ from monopriors.relative_depth_models import (
 from monopriors.relative_depth_models.base_relative_depth import BaseRelativePredictor
 from monopriors.rr_logging_utils import (
     log_relative_pred,
-    create_depth_comparison_blueprint,
+    create_relative_depth_blueprint,
 )
 import rerun as rr
 from gradio_rerun import Rerun
@@ -93,7 +93,7 @@ def load_models(
 def on_submit(rgb: UInt8[np.ndarray, "h w 3"], remove_flying_pixels: bool):
     stream: rr.BinaryStream = rr.binary_stream()
     models_list = [MODEL_1, MODEL_2]
-    blueprint = create_depth_comparison_blueprint(models_list)
+    blueprint = create_relative_depth_blueprint(models_list)
     rr.send_blueprint(blueprint)
 
     # resize the image to have a max dim of 1024

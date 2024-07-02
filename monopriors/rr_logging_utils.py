@@ -74,38 +74,39 @@ def log_relative_pred(
     )
 
 
-def create_depth_comparison_blueprint(
+def create_relative_depth_blueprint(
     models: list[BaseRelativePredictor],
 ) -> rrb.Blueprint:
     model_names: list[str] = [model.__class__.__name__ for model in models]
+    contents = [
+        rrb.Spatial3DView(origin=f"{model_names[0]}"),
+        rrb.Vertical(
+            rrb.Spatial2DView(
+                origin=f"{model_names[0]}/camera/pinhole/image",
+            ),
+            rrb.Spatial2DView(
+                origin=f"{model_names[0]}/camera/pinhole/depth",
+            ),
+            rrb.Spatial2DView(
+                origin=f"{model_names[0]}/camera/disparity",
+            ),
+        ),
+        rrb.Spatial3DView(origin=f"{model_names[1]}"),
+        rrb.Vertical(
+            rrb.Spatial2DView(
+                origin=f"{model_names[1]}/camera/pinhole/image",
+            ),
+            rrb.Spatial2DView(
+                origin=f"{model_names[1]}/camera/pinhole/depth",
+            ),
+            rrb.Spatial2DView(
+                origin=f"{model_names[1]}/camera/disparity",
+            ),
+        ),
+    ]
     blueprint = rrb.Blueprint(
         rrb.Horizontal(
-            contents=[
-                rrb.Spatial3DView(origin=f"{model_names[0]}"),
-                rrb.Vertical(
-                    rrb.Spatial2DView(
-                        origin=f"{model_names[0]}/camera/pinhole/image",
-                    ),
-                    rrb.Spatial2DView(
-                        origin=f"{model_names[0]}/camera/pinhole/depth",
-                    ),
-                    rrb.Spatial2DView(
-                        origin=f"{model_names[0]}/camera/disparity",
-                    ),
-                ),
-                rrb.Spatial3DView(origin=f"{model_names[1]}"),
-                rrb.Vertical(
-                    rrb.Spatial2DView(
-                        origin=f"{model_names[1]}/camera/pinhole/image",
-                    ),
-                    rrb.Spatial2DView(
-                        origin=f"{model_names[1]}/camera/pinhole/depth",
-                    ),
-                    rrb.Spatial2DView(
-                        origin=f"{model_names[1]}/camera/disparity",
-                    ),
-                ),
-            ],
+            contents=contents,
             column_shares=(3, 1, 3, 1),
         ),
         collapse_panels=True,
