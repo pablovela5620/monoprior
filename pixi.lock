@@ -7657,7 +7657,7 @@ packages:
   name: monopriors
   version: 0.1.0
   path: .
-  sha256: a618ce0a00762aaf4299b41481cb7b19f77e85845bec144a2502933b008da801
+  sha256: d634610b45a17336bd1e79da20f121b17dfae536aa192ef91f6c7b92bb26821b
   requires_dist:
   - huggingface-hub
   - opencv-python
