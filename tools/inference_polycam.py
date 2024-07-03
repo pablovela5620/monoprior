@@ -47,10 +47,10 @@ def log_mono_pred(
         rr.DepthImage(mono_pred.metric_pred.depth_meters, meter=1.0),
     )
     rr.log(f"{pinhole_path}/normal", rr.Image(mono_pred.normal_pred.normal_hw3))
-    rr.log(
-        f"{pinhole_path}/normal_conf",
-        rr.DepthImage(mono_pred.normal_pred.confidence_hw1),
-    )
+    # rr.log(
+    #     f"{pinhole_path}/normal_conf",
+    #     rr.DepthImage(mono_pred.normal_pred.confidence_hw1),
+    # )
     if gt_depth is not None:
         rr.log(f"{pinhole_path}/gt_depth", rr.DepthImage(gt_depth, meter=1000))
         # diff_depth_l1 = np.abs((depth_np.squeeze() - gt_depth))
@@ -65,13 +65,17 @@ def extract_zip(zip_path: Path, extract_dir: Path) -> None:
 
 
 def main(zip_path: Path) -> None:
+    print(zip_path)
     extract_dir: Path = zip_path.parent / zip_path.stem
+    print(extract_dir)
 
     if zip_path.is_file() and zip_path.exists() and (not extract_dir.exists()):
         extract_zip(zip_path, extract_dir=extract_dir)
         final_extract_dir: Path = extract_dir / extract_dir.name
     else:
-        final_extract_dir: Path = extract_dir / extract_dir.name
+        final_extract_dir: Path = extract_dir
+
+    print(final_extract_dir)
 
     image_dir: Path = final_extract_dir / "corrected_images"
     camera_dir: Path = final_extract_dir / "corrected_cameras"

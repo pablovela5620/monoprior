@@ -80,7 +80,7 @@ class DsineAndUnidepth(MonoPriorModel):
         self.depth_model = get_metric_predictor("UniDepthMetricPredictor")(
             device=self.device
         )
-        self.surface_model = get_normal_predictor("OmniNormalPredictor")(
+        self.surface_model = get_normal_predictor("DSineNormalPredictor")(
             device=self.device
         )
 

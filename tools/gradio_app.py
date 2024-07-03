@@ -61,6 +61,13 @@ def load_models(
     model_2: RELATIVE_PREDICTORS,
     progress=gr.Progress(),
 ) -> str:
+    models: list[int] = [model_1, model_2]
+    # check if the models are in the list of models to skip
+    if any(model in MODELS_TO_SKIP for model in models):
+        raise gr.Error(
+            f"Model not supported on ZeroGPU, please try another model: {MODELS_TO_SKIP}"
+        )
+
     global MODEL_1, MODEL_2
     # delete the previous models and clear gpu memory
     if "MODEL_1" in globals():
@@ -72,12 +79,6 @@ def load_models(
 
     progress(0, desc="Loading Models please wait...")
 
-    models: list[int] = [model_1, model_2]
-    # check if the models are in the list of models to skip
-    if any(model in MODELS_TO_SKIP for model in models):
-        raise gr.Error(
-            f"Model not supported on ZeroGPU, please try another model: {MODELS_TO_SKIP}"
-        )
     loaded_models = []
 
     for model in models:
