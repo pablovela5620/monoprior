@@ -532,9 +532,9 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/4b/2c/ffbf7a134b9ab11a67b0cf0726453cedd9c5043a4fe7a35d1cefa9a1bcfb/threadpoolctl-3.5.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/68/4f/12207897848a653d03ebbf6775a29d949408ded5f99b2d87198bc5c93508/tomlkit-0.12.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b7/8a/d82202c9f89eab30f9fc05380daae87d617e2ad11571ab23d7c13a29bb54/toolz-0.12.1-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/cb/e2/1bd899d3eb60c6495cf5d0d2885edacac08bde7a1407eadeb2ab36eca3c7/torch-2.3.1-cp310-cp310-manylinux1_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/08/04/17425bf3c0620465ee182cea5c674db4debab87ed0627145d38039cb2a9e/torchvision-0.18.1-cp310-cp310-manylinux1_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/d7/69/8a9fde07d2d27a90e16488cdfe9878e985a247b2496a4b5b1a2126042528/triton-2.3.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/43/e5/2ddae60ae999b224aceb74490abeb885ee118227f866cb12046f0481d4c9/torch-2.3.0-cp310-cp310-manylinux1_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/d4/7e/d41b771dbffa927b9cc37372b1e18c881348cd18a0e4ad73f2c6bdf56c0e/torchvision-0.18.0-cp310-cp310-manylinux1_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/db/ee/8d50d44ed5b63677bb387f4ee67a7dbaaded0189b320ffe82685a6827728/triton-2.3.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/20/b5/11cf2e34fbb11b937e006286ab5b8cfd334fde1c8fa4dd7f491226931180/typer-0.12.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b4/6d/0df8f7a6f1944ba619d93025ce468c9252aa10799d7140e07014dfc1a16c/ujson-5.10.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b2/f9/e6f30ba6094733e4f9794fd098ca0543a19b07ac1fa3075d595bf0f1fb60/uvicorn-0.30.1-py3-none-any.whl
@@ -543,6 +543,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/58/0a/7570e15661a0a546c3a1152d95fe8c05480459bab36247f0acbf41f01a41/websockets-11.0.3-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/9d/6e/e792999e816d19d7fcbfa94c730936750036d65656a76a5a688b57a656c4/werkzeug-3.0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/c1/68423f43bc95d873d745bef8030ecf47cd67f932f20b3f7080a02cff43ca/widgetsnbextension-4.0.11-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/32/e7/27003645ef99e7571fb6964cd2f39da3f1b3f3011aa00bb2d3ac9b790757/xformers-0.0.26.post1-cp310-cp310-manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/66/c9/d4b03b2490107f13ebd68fe9496d41ae41a7de6275ead56d0d4621b11ffd/yapf-0.40.2-py3-none-any.whl
       - pypi: .
   spaces:
@@ -1054,7 +1055,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/da/d3/8057f0587683ed2fcd4dbfbdfdfa807b9160b809976099d36b8f60d08f03/nvidia_nvtx_cu12-12.1.105-py3-none-manylinux1_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/12/60/17ed502ab8258e36b6caf478974994f15691c73e3c46abf82a2ec63e9eda/omnidata_tools-0.0.23-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3b/e1/fc609763d982c6c43ee9503279fa6dc42d048b6224a9dc0a0ce8ac19308a/open3d-0.18.0-cp310-cp310-manylinux_2_27_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/3f/a4/d2537f47fd7fcfba966bd806e3ec18e7ee1681056d4b0a9c8d983983e4d5/opencv_python-4.10.0.84-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/89/ab/bcecb53836760d5ac9e09937ee0bb445d8701e38ad3ffdace37930069e7f/opencv_python-4.10.0.82-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/6c/4d/313dcbecc7ab7d9d3590dba4be613e3e8b7df821d6ab77a6cb17e58fc7ae/orjson-3.10.5-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/0b/f8/b65cdd2be32e442c4efe7b672f73c90b05eab5a7f3f4115efe181d432c60/plotly-5.22.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/17/ba/1b65c9cbc49e0c7cd1be086c63209e9ad883c2a409be4746c21db4263f41/pydantic-2.7.4-py3-none-any.whl
@@ -1078,9 +1079,9 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/4b/2c/ffbf7a134b9ab11a67b0cf0726453cedd9c5043a4fe7a35d1cefa9a1bcfb/threadpoolctl-3.5.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/68/4f/12207897848a653d03ebbf6775a29d949408ded5f99b2d87198bc5c93508/tomlkit-0.12.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b7/8a/d82202c9f89eab30f9fc05380daae87d617e2ad11571ab23d7c13a29bb54/toolz-0.12.1-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/cb/e2/1bd899d3eb60c6495cf5d0d2885edacac08bde7a1407eadeb2ab36eca3c7/torch-2.3.1-cp310-cp310-manylinux1_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/08/04/17425bf3c0620465ee182cea5c674db4debab87ed0627145d38039cb2a9e/torchvision-0.18.1-cp310-cp310-manylinux1_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/d7/69/8a9fde07d2d27a90e16488cdfe9878e985a247b2496a4b5b1a2126042528/triton-2.3.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/43/e5/2ddae60ae999b224aceb74490abeb885ee118227f866cb12046f0481d4c9/torch-2.3.0-cp310-cp310-manylinux1_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/d4/7e/d41b771dbffa927b9cc37372b1e18c881348cd18a0e4ad73f2c6bdf56c0e/torchvision-0.18.0-cp310-cp310-manylinux1_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/db/ee/8d50d44ed5b63677bb387f4ee67a7dbaaded0189b320ffe82685a6827728/triton-2.3.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/20/b5/11cf2e34fbb11b937e006286ab5b8cfd334fde1c8fa4dd7f491226931180/typer-0.12.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b4/6d/0df8f7a6f1944ba619d93025ce468c9252aa10799d7140e07014dfc1a16c/ujson-5.10.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b2/f9/e6f30ba6094733e4f9794fd098ca0543a19b07ac1fa3075d595bf0f1fb60/uvicorn-0.30.1-py3-none-any.whl
@@ -1089,6 +1090,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/58/0a/7570e15661a0a546c3a1152d95fe8c05480459bab36247f0acbf41f01a41/websockets-11.0.3-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/9d/6e/e792999e816d19d7fcbfa94c730936750036d65656a76a5a688b57a656c4/werkzeug-3.0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/c1/68423f43bc95d873d745bef8030ecf47cd67f932f20b3f7080a02cff43ca/widgetsnbextension-4.0.11-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/32/e7/27003645ef99e7571fb6964cd2f39da3f1b3f3011aa00bb2d3ac9b790757/xformers-0.0.26.post1-cp310-cp310-manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/66/c9/d4b03b2490107f13ebd68fe9496d41ae41a7de6275ead56d0d4621b11ffd/yapf-0.40.2-py3-none-any.whl
       - pypi: .
 packages:
@@ -7657,19 +7659,37 @@ packages:
   name: monopriors
   version: 0.1.0
   path: .
-  sha256: d634610b45a17336bd1e79da20f121b17dfae536aa192ef91f6c7b92bb26821b
+  sha256: 4d53606f6df44cfe0d4f31310f8c3a434f8b41ecf0362cfb81a59008e6cc884b
   requires_dist:
-  - huggingface-hub
-  - opencv-python
-  - geffnet
+  - opencv-python>=4.10.0.82
+  - geffnet>=1.0.2
   - calibur==0.0.1
-  - omnidata-tools
-  - open3d
-  - gradio-imageslider
-  - gradio
-  - gradio-rerun>=0.0.3
-  - hf-transfer
-  - mmcv-lite
+  - omnidata-tools>=0.0.23
+  - open3d>=0.18.0
+  - gradio-imageslider>=0.0.20
+  - gradio==4.36.1
+  - gradio-rerun==0.0.3
+  - hf-transfer==0.1.6
+  - mmcv-lite==2.2.0
+  - torch==2.3.0
+  - torchvision==0.18.0
+  - icecream==2.1.3
+  - jaxtyping
+  - einops
+  - matplotlib
+  - wandb
+  - scipy
+  - timm
+  - pandas
+  - pyarrow
+  - pytorch-lightning
+  - jupyterlab
+  - rerun-sdk==0.16.1
+  - numpy<2.0.0
+  - beartype
+  - transformers
+  - xformers>=0.0.26.post1,<0.0.27
+  requires_python: '>=3.10.0'
   editable: true
 - kind: conda
   name: mpc
@@ -8225,23 +8245,6 @@ packages:
   version: 4.10.0.82
   url: https://files.pythonhosted.org/packages/89/ab/bcecb53836760d5ac9e09937ee0bb445d8701e38ad3ffdace37930069e7f/opencv_python-4.10.0.82-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
   sha256: 955c5ce8ac90c9e4636ad7f5c0d9c75b80abbe347182cfd09b0e3eec6e50472c
-  requires_dist:
-  - numpy>=1.13.3 ; python_version < '3.7'
-  - numpy>=1.21.0 ; python_version <= '3.9' and platform_system == 'Darwin' and platform_machine == 'arm64'
-  - numpy>=1.21.2 ; python_version >= '3.10'
-  - numpy>=1.21.4 ; python_version >= '3.10' and platform_system == 'Darwin'
-  - numpy>=1.23.5 ; python_version >= '3.11'
-  - numpy>=1.26.0 ; python_version >= '3.12'
-  - numpy>=1.19.3 ; python_version >= '3.6' and platform_system == 'Linux' and platform_machine == 'aarch64'
-  - numpy>=1.17.0 ; python_version >= '3.7'
-  - numpy>=1.17.3 ; python_version >= '3.8'
-  - numpy>=1.19.3 ; python_version >= '3.9'
-  requires_python: '>=3.6'
-- kind: pypi
-  name: opencv-python
-  version: 4.10.0.84
-  url: https://files.pythonhosted.org/packages/3f/a4/d2537f47fd7fcfba966bd806e3ec18e7ee1681056d4b0a9c8d983983e4d5/opencv_python-4.10.0.84-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-  sha256: 9ace140fc6d647fbe1c692bcb2abce768973491222c067c131d80957c595b71f
   requires_dist:
   - numpy>=1.13.3 ; python_version < '3.7'
   - numpy>=1.21.0 ; python_version <= '3.9' and platform_system == 'Darwin' and platform_machine == 'arm64'
@@ -10355,9 +10358,9 @@ packages:
   requires_python: '>=3.7'
 - kind: pypi
   name: torch
-  version: 2.3.1
-  url: https://files.pythonhosted.org/packages/cb/e2/1bd899d3eb60c6495cf5d0d2885edacac08bde7a1407eadeb2ab36eca3c7/torch-2.3.1-cp310-cp310-manylinux1_x86_64.whl
-  sha256: 605a25b23944be5ab7c3467e843580e1d888b8066e5aaf17ff7bf9cc30001cc3
+  version: 2.3.0
+  url: https://files.pythonhosted.org/packages/43/e5/2ddae60ae999b224aceb74490abeb885ee118227f866cb12046f0481d4c9/torch-2.3.0-cp310-cp310-manylinux1_x86_64.whl
+  sha256: d8ea5a465dbfd8501f33c937d1f693176c9aef9d1c1b0ca1d44ed7b0a18c52ac
   requires_dist:
   - filelock
   - typing-extensions>=4.8.0
@@ -10376,7 +10379,7 @@ packages:
   - nvidia-cusparse-cu12==12.1.0.106 ; platform_system == 'Linux' and platform_machine == 'x86_64'
   - nvidia-nccl-cu12==2.20.5 ; platform_system == 'Linux' and platform_machine == 'x86_64'
   - nvidia-nvtx-cu12==12.1.105 ; platform_system == 'Linux' and platform_machine == 'x86_64'
-  - triton==2.3.1 ; platform_system == 'Linux' and platform_machine == 'x86_64' and python_version < '3.12'
+  - triton==2.3.0 ; platform_system == 'Linux' and platform_machine == 'x86_64' and python_version < '3.12'
   - mkl<=2021.4.0,>=2021.1.1 ; platform_system == 'Windows'
   - opt-einsum>=3.3 ; extra == 'opt-einsum'
   - optree>=0.9.1 ; extra == 'optree'
@@ -10422,12 +10425,12 @@ packages:
   timestamp: 1712608890813
 - kind: pypi
   name: torchvision
-  version: 0.18.1
-  url: https://files.pythonhosted.org/packages/08/04/17425bf3c0620465ee182cea5c674db4debab87ed0627145d38039cb2a9e/torchvision-0.18.1-cp310-cp310-manylinux1_x86_64.whl
-  sha256: 0b3bda0aa5b416eeb547143b8eeaf17720bdba9cf516dc991aacb81811aa96a5
+  version: 0.18.0
+  url: https://files.pythonhosted.org/packages/d4/7e/d41b771dbffa927b9cc37372b1e18c881348cd18a0e4ad73f2c6bdf56c0e/torchvision-0.18.0-cp310-cp310-manylinux1_x86_64.whl
+  sha256: 493c45f9937dad37aa1b64b14da17c7a589c72b91adc4837d431009cfe29bd53
   requires_dist:
   - numpy
-  - torch==2.3.1
+  - torch==2.3.0
   - pillow!=8.3.*,>=5.3.0
   - scipy ; extra == 'scipy'
   requires_python: '>=3.8'
@@ -10538,9 +10541,9 @@ packages:
   timestamp: 1719605223580
 - kind: pypi
   name: triton
-  version: 2.3.1
-  url: https://files.pythonhosted.org/packages/d7/69/8a9fde07d2d27a90e16488cdfe9878e985a247b2496a4b5b1a2126042528/triton-2.3.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-  sha256: 3c84595cbe5e546b1b290d2a58b1494df5a2ef066dd890655e5b8a8a92205c33
+  version: 2.3.0
+  url: https://files.pythonhosted.org/packages/db/ee/8d50d44ed5b63677bb387f4ee67a7dbaaded0189b320ffe82685a6827728/triton-2.3.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  sha256: 5ce4b8ff70c48e47274c66f269cce8861cf1dc347ceeb7a67414ca151b1822d8
   requires_dist:
   - filelock
   - cmake>=3.20 ; extra == 'build'
@@ -11067,6 +11070,15 @@ packages:
   purls: []
   size: 52114
   timestamp: 1684679248466
+- kind: pypi
+  name: xformers
+  version: 0.0.26.post1
+  url: https://files.pythonhosted.org/packages/32/e7/27003645ef99e7571fb6964cd2f39da3f1b3f3011aa00bb2d3ac9b790757/xformers-0.0.26.post1-cp310-cp310-manylinux2014_x86_64.whl
+  sha256: 1fe0f9a3dddb7f6175c2e34de2f318d6742eec28c068b8334b093016b2c9c2c8
+  requires_dist:
+  - numpy
+  - torch==2.3.0
+  requires_python: '>=3.7'
 - kind: conda
   name: xformers
   version: 0.0.26.post1
