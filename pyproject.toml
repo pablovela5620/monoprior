@@ -8,14 +8,14 @@ readme = "README.md"
 dependencies = [
     "opencv-python>=4.10.0.82",
     "geffnet>=1.0.2",
-    "calibur==0.0.1",
+    "calibur>=0.0.1",
     "omnidata-tools>=0.0.23",
     "open3d>=0.18.0",
     "gradio-imageslider>=0.0.20",
-    "gradio==4.36.1",
+    "gradio>=4.37.2",
     "gradio-rerun==0.0.3",
-    "hf-transfer==0.1.6",
-    "mmcv-lite==2.2.0",
+    "hf-transfer>=0.1.6",
+    "mmcv-lite>=2.2.0",
     # pypi only
     "torch==2.3.0",
     "torchvision==0.18.0",
@@ -119,6 +119,7 @@ rerun-sdk = ">=0.16.1,<0.17"
 numpy = "<2.0.0"
 beartype = ">=0.18.5,<0.19"
 transformers = ">=4.42.3,<4.43"
+gradio = ">=4.37.2,<4.38"
 
 [tool.pixi.pypi-dependencies]
 monopriors = { path = ".", editable = true }
