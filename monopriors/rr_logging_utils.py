@@ -15,6 +15,7 @@ def log_relative_pred(
     rgb_hw3: UInt8[np.ndarray, "h w 3"],
     remove_flying_pixels: bool = True,
     jpeg_quality: int = 90,
+    depth_edge_threshold: float = 1.1,
 ) -> None:
     cam_log_path: Path = parent_log_path / "camera"
     pinhole_path: Path = cam_log_path / "pinhole"
@@ -45,7 +46,9 @@ def log_relative_pred(
 
     depth_hw: Float32[np.ndarray, "h w"] = relative_pred.depth
     if remove_flying_pixels:
-        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(depth_hw, threshold=0.1)
+        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(
+            depth_hw, threshold=depth_edge_threshold
+        )
         depth_hw: Float32[np.ndarray, "h w"] = depth_hw * ~edges_mask
 
     rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_hw))

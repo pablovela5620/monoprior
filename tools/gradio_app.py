@@ -92,7 +92,11 @@ def load_models(
 
 
 @rr.thread_local_stream("depth")
-def on_submit(rgb: UInt8[np.ndarray, "h w 3"], remove_flying_pixels: bool):
+def on_submit(
+    rgb: UInt8[np.ndarray, "h w 3"],
+    remove_flying_pixels: bool,
+    depth_map_threshold: float,
+):
     stream: rr.BinaryStream = rr.binary_stream()
     models_list = [MODEL_1, MODEL_2]
     blueprint = create_relative_depth_blueprint(models_list)
@@ -118,6 +122,7 @@ def on_submit(rgb: UInt8[np.ndarray, "h w 3"], remove_flying_pixels: bool):
                 relative_pred=relative_pred,
                 rgb_hw3=rgb,
                 remove_flying_pixels=remove_flying_pixels,
+                depth_edge_threshold=depth_map_threshold,
             )
 
             yield stream.read()
@@ -145,11 +150,19 @@ with gr.Blocks() as demo:
                 value="Scale | Shift Invariant",
                 interactive=True,
             )
-            remove_flying_pixels = gr.Checkbox(
-                label="Remove Flying Pixels",
-                value=True,
-                interactive=True,
-            )
+            with gr.Row():
+                remove_flying_pixels = gr.Checkbox(
+                    label="Remove Flying Pixels",
+                    value=True,
+                    interactive=True,
+                )
+                depth_map_threshold = gr.Slider(
+                    label="Lower is more aggressive pruning, Higher is less aggressive pruning",
+                    minimum=0.05,
+                    maximum=0.95,
+                    step=0.05,
+                    value=0.1,
+                )
             with gr.Row():
                 model_1_dropdown = gr.Dropdown(
                     choices=list(get_args(RELATIVE_PREDICTORS)),
@@ -174,7 +187,7 @@ with gr.Blocks() as demo:
 
     submit.click(
         on_submit,
-        inputs=[input_image, remove_flying_pixels],
+        inputs=[input_image, remove_flying_pixels, depth_map_threshold],
         outputs=[rr_viewer],
     )
 
@@ -188,7 +201,7 @@ with gr.Blocks() as demo:
     examples_list = sorted([str(path) for path in examples_paths])
     examples = gr.Examples(
         examples=examples_list,
-        inputs=[input_image],
+        inputs=[input_image, remove_flying_pixels, depth_map_threshold],
         outputs=[rr_viewer],
         fn=on_submit,
         cache_examples=False,
