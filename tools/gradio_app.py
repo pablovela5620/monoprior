@@ -137,75 +137,72 @@ with gr.Blocks() as demo:
     gr.Markdown(description3)
     gr.Markdown("### Depth Prediction demo")
 
-    with gr.Row():
-        input_image = gr.Image(
-            label="Input Image",
-            type="numpy",
-            height=300,
+    with gr.Tab(label="Scale and Shift Invariant"):
+        with gr.Row():
+            input_image = gr.Image(
+                label="Input Image",
+                type="numpy",
+                height=300,
+            )
+            with gr.Column():
+                with gr.Row():
+                    remove_flying_pixels = gr.Checkbox(
+                        label="Remove Flying Pixels",
+                        value=True,
+                        interactive=True,
+                    )
+                    depth_map_threshold = gr.Slider(
+                        label="⬇️ number == more pruning ⬆️ less pruning",
+                        minimum=0.05,
+                        maximum=0.95,
+                        step=0.05,
+                        value=0.1,
+                    )
+                with gr.Row():
+                    model_1_dropdown = gr.Dropdown(
+                        choices=list(get_args(RELATIVE_PREDICTORS)),
+                        label="Model1",
+                        value="DepthAnythingV2Predictor",
+                    )
+                    model_2_dropdown = gr.Dropdown(
+                        choices=list(get_args(RELATIVE_PREDICTORS)),
+                        label="Model2",
+                        value="UniDepthRelativePredictor",
+                    )
+                model_status = gr.Textbox(
+                    label="Model Status",
+                    value=model_load_status,
+                    interactive=False,
+                )
+
+        with gr.Row():
+            submit = gr.Button(value="Compute Depth")
+            load_models_btn = gr.Button(value="Load Models")
+        rr_viewer = Rerun(streaming=True, height=800)
+
+        submit.click(
+            on_submit,
+            inputs=[input_image, remove_flying_pixels, depth_map_threshold],
+            outputs=[rr_viewer],
         )
-        with gr.Column():
-            gr.Radio(
-                choices=["Scale | Shift Invariant", "Metric (TODO)"],
-                label="Depth Type",
-                value="Scale | Shift Invariant",
-                interactive=True,
-            )
-            with gr.Row():
-                remove_flying_pixels = gr.Checkbox(
-                    label="Remove Flying Pixels",
-                    value=True,
-                    interactive=True,
-                )
-                depth_map_threshold = gr.Slider(
-                    label="Lower is more aggressive pruning, Higher is less aggressive pruning",
-                    minimum=0.05,
-                    maximum=0.95,
-                    step=0.05,
-                    value=0.1,
-                )
-            with gr.Row():
-                model_1_dropdown = gr.Dropdown(
-                    choices=list(get_args(RELATIVE_PREDICTORS)),
-                    label="Model1",
-                    value="DepthAnythingV2Predictor",
-                )
-                model_2_dropdown = gr.Dropdown(
-                    choices=list(get_args(RELATIVE_PREDICTORS)),
-                    label="Model2",
-                    value="UniDepthRelativePredictor",
-                )
-            model_status = gr.Textbox(
-                label="Model Status",
-                value=model_load_status,
-                interactive=False,
-            )
 
-    with gr.Row():
-        submit = gr.Button(value="Compute Depth")
-        load_models_btn = gr.Button(value="Load Models")
-    rr_viewer = Rerun(streaming=True, height=800)
+        load_models_btn.click(
+            load_models,
+            inputs=[model_1_dropdown, model_2_dropdown],
+            outputs=[model_status],
+        )
 
-    submit.click(
-        on_submit,
-        inputs=[input_image, remove_flying_pixels, depth_map_threshold],
-        outputs=[rr_viewer],
-    )
-
-    load_models_btn.click(
-        load_models,
-        inputs=[model_1_dropdown, model_2_dropdown],
-        outputs=[model_status],
-    )
-
-    examples_paths = Path("examples").glob("*.jpeg")
-    examples_list = sorted([str(path) for path in examples_paths])
-    examples = gr.Examples(
-        examples=examples_list,
-        inputs=[input_image, remove_flying_pixels, depth_map_threshold],
-        outputs=[rr_viewer],
-        fn=on_submit,
-        cache_examples=False,
-    )
+        # get all jpegs in examples path
+        examples_paths = Path("examples").glob("*.jpeg")
+        # set the examples to be the sorted list of input parameterss (path, remove_flying_pixels, depth_map_threshold)
+        examples_list = sorted([[str(path), True, 0.1] for path in examples_paths])
+        examples = gr.Examples(
+            examples=examples_list,
+            inputs=[input_image, remove_flying_pixels, depth_map_threshold],
+            outputs=[rr_viewer],
+            fn=on_submit,
+            cache_examples=False,
+        )
 
 if __name__ == "__main__":
     demo.launch()

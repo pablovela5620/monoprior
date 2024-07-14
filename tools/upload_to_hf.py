@@ -18,6 +18,9 @@ def main(upload_examples: bool) -> None:
     assert space_id is not None, "Please set the SPACE_ID environment variable"
     assert whl_path is not None, "Please set the WHL_PATH environment variable"
 
+    print(f"SPACE_ID: {space_id}")
+    print(f"WHL_PATH: {whl_path}")
+
     files_to_upload: list[FileUpload] = [
         {"local_path": "./tools/app.py", "repo_path": "app.py"},
         {"local_path": "./tools/gradio_app.py", "repo_path": "gradio_app.py"},
