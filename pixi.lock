@@ -7728,7 +7728,7 @@ packages:
   name: monopriors
   version: 0.1.0
   path: .
-  sha256: 2959943ae6528dc6f77a44c52a48e3bfd642371a59b20a00c84ef4439965bd97
+  sha256: 9348b384dd3a7f22a7b70a191419c0e7d362309180a02aaa8b5f3de1eaa96a3a
   requires_dist:
   - opencv-python>=4.10.0.82
   - geffnet>=1.0.2
@@ -7742,7 +7742,7 @@ packages:
   - mmcv-lite>=2.2.0
   - torch==2.3.0
   - torchvision==0.18.0
-  - icecream==2.1.3
+  - icecream>=2.1.3
   - jaxtyping
   - einops
   - matplotlib
