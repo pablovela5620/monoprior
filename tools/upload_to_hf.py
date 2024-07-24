@@ -29,6 +29,7 @@ def main(upload_examples: bool) -> None:
             "repo_path": f"{whl_path}",
         },
         {"local_path": "./pyproject.toml", "repo_path": "pyproject.toml"},
+        {"local_path": "./pixi.lock", "repo_path": "pixi.lock"},
         {"local_path": "./.pixi.sh", "repo_path": ".pixi.sh"},
     ]
 

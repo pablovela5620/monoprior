@@ -126,6 +126,7 @@ beartype = ">=0.18.5,<0.19"
 transformers = ">=4.42.3,<4.43"
 gradio = ">=4.37.2,<4.38"
 rerun-sdk = ">=0.17.0,<0.18"
+pyperclip = "==1.8.2"
 
 [tool.pixi.pypi-dependencies]
 monopriors = { path = ".", editable = true }
