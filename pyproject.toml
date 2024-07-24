@@ -13,7 +13,7 @@ dependencies = [
     "open3d>=0.18.0",
     "gradio-imageslider>=0.0.20",
     "gradio>=4.37.2",
-    "gradio-rerun==0.0.3",
+    "gradio-rerun==0.0.4",
     "hf-transfer>=0.1.6",
     "mmcv-lite>=2.2.0",
     # pypi only
@@ -30,7 +30,7 @@ dependencies = [
     "pyarrow",
     "pytorch-lightning",
     "jupyterlab",
-    "rerun-sdk==0.16.1",
+    "rerun-sdk>=0.17.0,<0.18",
     "numpy<2.0.0",
     "beartype",
     "transformers",
@@ -39,7 +39,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["monopriors*"]
+include = ["monopriors*", "tools*"]
 
 [tool.pixi.project]
 channels = [
@@ -121,11 +121,11 @@ pyarrow = ">=15.0.2,<15.1"
 pytorch-lightning = ">=2.2.2,<2.3"
 xformers = ">=0.0.26.post1,<0.0.27"
 jupyterlab = ">=4.2.0,<4.3"
-rerun-sdk = ">=0.16.1,<0.17"
 numpy = "<2.0.0"
 beartype = ">=0.18.5,<0.19"
 transformers = ">=4.42.3,<4.43"
 gradio = ">=4.37.2,<4.38"
+rerun-sdk = ">=0.17.0,<0.18"
 
 [tool.pixi.pypi-dependencies]
 monopriors = { path = ".", editable = true }
