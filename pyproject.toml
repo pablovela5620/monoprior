@@ -12,8 +12,8 @@ dependencies = [
     "omnidata-tools>=0.0.23",
     "open3d>=0.18.0",
     "gradio-imageslider>=0.0.20",
-    "gradio>=4.37.2",
-    "gradio-rerun==0.0.4",
+    # "gradio>=4.37.2",
+    # "gradio-rerun==0.0.4",
     "hf-transfer>=0.1.6",
     "mmcv-lite>=2.2.0",
     # pypi only
