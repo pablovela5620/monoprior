@@ -6,7 +6,7 @@ requires-python = ">=3.10.0"
 readme = "README.md"
 
 dependencies = [
-    "opencv-python>=4.10.0.82",
+    "opencv-python",
     "geffnet>=1.0.2",
     "calibur>=0.0.1",
     "omnidata-tools>=0.0.23",
