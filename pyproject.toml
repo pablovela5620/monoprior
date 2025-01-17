@@ -30,7 +30,7 @@ dependencies = [
     "pyarrow",
     "pytorch-lightning",
     "jupyterlab",
-    "rerun-sdk>=0.17.0,<0.18",
+    "rerun-sdk>=0.17.0",
     "numpy<2.0.0",
     "beartype",
     "transformers",
