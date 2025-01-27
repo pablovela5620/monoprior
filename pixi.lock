@@ -6366,7 +6366,7 @@ packages:
 - pypi: .
   name: monopriors
   version: 0.1.0
-  sha256: f335e7a90b4f1e37d5b694c1085b9f02766ad410835773e72a3a83404416b48e
+  sha256: ba5c83676f81defe93eb5137091048e978fbbec3d5fb6e521a5a452166b27dfc
   requires_dist:
   - opencv-python
   - geffnet>=1.0.2
