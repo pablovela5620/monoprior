@@ -32,6 +32,7 @@ class UniDepthMetricPredictor(BaseMetricPredictor):
             .to(device)
             .eval()
         )
+        self.model.resolution_level = 0
         print(f"UniDepth model loaded. Time: {timer() - start:.2f}s")
 
     def __call__(

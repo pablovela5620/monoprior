@@ -2,7 +2,7 @@
 name = "monopriors"
 version = "0.1.0"
 description = "Monocular Geometric Priors"
-requires-python = ">=3.10.0"
+requires-python = ">=3.11.0"
 readme = "README.md"
 
 dependencies = [
@@ -10,31 +10,9 @@ dependencies = [
     "geffnet>=1.0.2",
     "calibur>=0.0.1",
     "omnidata-tools>=0.0.23",
-    "open3d>=0.18.0",
-    "gradio-imageslider>=0.0.20",
-    # "gradio>=4.37.2",
-    # "gradio-rerun==0.0.4",
     "hf-transfer>=0.1.6",
     "mmcv-lite>=2.2.0",
     # pypi only
-    "torch==2.3.0",
-    "torchvision==0.18.0",
-    "icecream>=2.1.3",
-    "jaxtyping",
-    "einops",
-    "matplotlib",
-    "wandb",
-    "scipy",
-    "timm",
-    "pandas",
-    "pyarrow",
-    "pytorch-lightning",
-    "jupyterlab",
-    "rerun-sdk",
-    "numpy<2.0.0",
-    "beartype",
-    "transformers",
-    "xformers",
 
 ]
 
@@ -42,17 +20,12 @@ dependencies = [
 include = ["monopriors*", "tools*"]
 
 [tool.pixi.project]
-channels = [
-    "nvidia/label/cuda-11.8.0",
-    "nvidia",
-    "xformers",
-    "conda-forge",
-    "pytorch",
-]
+channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64"]
 
 [tool.pixi.system-requirements]
 libc = { family = "glibc", version = "2.31" }
+cuda = "12.0"
 
 [tool.pixi.activation]
 scripts = [".pixi.sh"]
@@ -60,11 +33,12 @@ scripts = [".pixi.sh"]
 [tool.pixi.tasks]
 _install-wheel = "python -m pip install $WHL_PATH --force-reinstall"
 _build-wheel = "python -m pip install build && python -m build"
-upload-hf = { cmd = "python tools/upload_to_hf.py", depends_on = [
+_upload-pypi = "python -m pip install twine && twine check dist/*"
+upload-hf = { cmd = "python tools/upload_to_hf.py", depends-on = [
     "_build-wheel",
 ] }
 
-[tool.pixi.tasks.download-example]
+[tool.pixi.tasks._download-example]
 cmd = """
     test -e data/example-room-scan-poly.zip
     || (
@@ -79,38 +53,44 @@ description = "Downloads an example polycam dataset from huggingface"
 [tool.pixi.tasks.polycam-inference]
 cmd = """
     python tools/inference_polycam.py \
-    --zip-path data/example-room-scan-poly.zip
+    --polycam-zip-path data/example-room-scan-poly.zip
     """
-depends_on = ["download-example"]
+depends-on = ["_download-example"]
 description = "Runs inference on polycam dataset on downloaded example, this will predict depths+normals"
 
-[tool.pixi.tasks.app]
+
+[tool.pixi.tasks.vo]
+cmd = """
+    python tools/inference_polycam.py \
+    --polycam-zip-path data/example-room-scan-poly.zip
+    """
+depends-on = ["_download-example"]
+description = "Runs inference on polycam dataset on downloaded example, this will predict depths+normals"
+
+[tool.pixi.feature.app.tasks.app]
 cmd = """
     python tools/gradio_app.py
     """
 description = "Runs Gradio frontend for depth comparison"
 
-[tool.pixi.tasks.dev-app]
+[tool.pixi.feature.app.tasks.dev-app]
 cmd = """
     gradio tools/gradio_app.py
     """
 description = "Runs Gradio frontend for hotreload"
 
-[tool.pixi.feature.spaces.tasks.app]
+[tool.pixi.feature.spaces.tasks.zero-app]
 cmd = """
     PYTORCH_JIT=0 python gradio_app.py
     """
 description = "Runs Gradio frontend for depth comparison"
-depends_on = ["_install-wheel"]
+depends-on = ["_install-wheel"]
 
 [tool.pixi.dependencies]
-python = "3.10.*"
+python = "3.11.*"
 pip = "24.*"
-cuda = { version = "*", channel = "nvidia/label/cuda-11.8.0" }
-pytorch = { version = "2.3.0", channel = "pytorch" }
-torchvision = { version = "0.18.0", channel = "pytorch" }
 icecream = ">=2.1.3,<2.2"
-jaxtyping = ">=0.2.28,<0.3"
+jaxtyping = ">=0.2.36,<0.3"
 einops = ">=0.8.0,<0.9"
 matplotlib = ">=3.8.3,<3.9"
 wandb = ">=0.16.5,<0.17"
@@ -119,24 +99,33 @@ timm = ">=0.9.16,<0.10"
 pandas = ">=2.2.2,<2.3"
 pyarrow = ">=15.0.2,<15.1"
 pytorch-lightning = ">=2.2.2,<2.3"
-xformers = ">=0.0.26.post1,<0.0.27"
 jupyterlab = ">=4.2.0,<4.3"
 numpy = "<2.0.0"
-beartype = ">=0.18.5,<0.19"
+beartype = ">=0.19,<0.20"
 transformers = ">=4.42.3,<4.43"
-gradio = ">=4.37.2,<4.38"
-rerun-sdk = ">=0.17.0,<0.18"
-pyperclip = "==1.8.2"
+rerun-sdk = ">=0.21.0,<0.22"
+pyserde = ">=0.23.0,<0.24"
+tyro = ">=0.9.1,<0.10"
+pytorch-gpu = ">=2.4.0,<3"
+xformers = ">=0.0.27,<0.0.28"
+open3d = ">=0.19.0,<0.20"
 
 [tool.pixi.pypi-dependencies]
 monopriors = { path = ".", editable = true }
+simplecv = { git = "https://github.com/pablovela5620/simplecv.git" }
+
+[tool.pixi.feature.app.dependencies]
+gradio = "<5"
+
+[tool.pixi.feature.app.pypi-dependencies]
+gradio-rerun = { url = "https://huggingface.co/datasets/pablovela5620/gradio4-rerun-0.21/resolve/main/dist/gradio_rerun-0.0.10-py3-none-any.whl" }
 
 [tool.pixi.feature.spaces.pypi-dependencies]
 spaces = "*"
 
-
 [tool.pixi.environments]
-spaces = { features = ["spaces"], solve-group = "default" }
+app = { features = ["app"], solve-group = "default" }
+spaces = { features = ["spaces"], solve-group = "app" }
 
 [tool.ruff]
 ignore = [
