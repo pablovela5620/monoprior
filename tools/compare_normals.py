@@ -55,9 +55,9 @@ def main(zip_path: Path):
 
     image_dir = final_extract_dir / "corrected_images"
 
-    assert (
-        image_dir.exists() and image_dir.is_dir()
-    ), f"Image directory not found: {image_dir}"
+    assert image_dir.exists() and image_dir.is_dir(), (
+        f"Image directory not found: {image_dir}"
+    )
 
     image_paths = sorted(image_dir.glob("*.jpg"))
 
