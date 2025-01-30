@@ -1,14 +1,12 @@
 [project]
 name = "monopriors"
-version = "0.3.0"
+version = "0.3.1"
 description = "Monocular Geometric Priors"
 requires-python = ">=3.11.0"
 readme = "README.md"
 
 dependencies = [
-    "opencv-python",
     "geffnet>=1.0.2",
-    "calibur>=0.0.1",
     "omnidata-tools>=0.0.23",
     "hf-transfer>=0.1.6",
     "mmcv-lite>=2.2.0",

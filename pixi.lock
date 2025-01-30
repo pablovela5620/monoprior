@@ -514,7 +514,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6a/00/b08f23b7d7e1e14ce01419a467b583edbb93c6cdb8654e54a9cc579cd61f/addict-2.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/dc/95/1ec57df6c52152fb4c776da5fbb2896f19af52de3776899d91e7140e7654/aria2p-0.12.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/35/bf/9cad857b630c840738003eb24c1adb63490a1024ec40a9dcc3a753300c38/asciimatics-1.15.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/ba/d6/b3046c86cdbb32084b94bbf4324d47acc9991419c2775dc4038fff19950e/calibur-0.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2b/16/b911d4c40eddeed8ffe195763f23fb68867210b4e347ed968ea45d2c9d4f/fastcore-1.7.28-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ed/1f/95cb961341bf33e534a472672ef4916c90046dc3c57b1442f5586dda72f1/geffnet-1.0.2-py3-none-any.whl
       - pypi: direct+https://huggingface.co/datasets/pablovela5620/gradio4-rerun-0.21/resolve/main/dist/gradio_rerun-0.0.10-py3-none-any.whl
@@ -996,7 +995,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/6a/00/b08f23b7d7e1e14ce01419a467b583edbb93c6cdb8654e54a9cc579cd61f/addict-2.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/dc/95/1ec57df6c52152fb4c776da5fbb2896f19af52de3776899d91e7140e7654/aria2p-0.12.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/35/bf/9cad857b630c840738003eb24c1adb63490a1024ec40a9dcc3a753300c38/asciimatics-1.15.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/ba/d6/b3046c86cdbb32084b94bbf4324d47acc9991419c2775dc4038fff19950e/calibur-0.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2b/16/b911d4c40eddeed8ffe195763f23fb68867210b4e347ed968ea45d2c9d4f/fastcore-1.7.28-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ed/1f/95cb961341bf33e534a472672ef4916c90046dc3c57b1442f5586dda72f1/geffnet-1.0.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d6/d8/f87ea6f42456254b48915970ed98e993110521e9263472840174d32c880d/hf_transfer-0.1.9-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
@@ -1480,7 +1478,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/dc/95/1ec57df6c52152fb4c776da5fbb2896f19af52de3776899d91e7140e7654/aria2p-0.12.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/35/bf/9cad857b630c840738003eb24c1adb63490a1024ec40a9dcc3a753300c38/asciimatics-1.15.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/ba/d6/b3046c86cdbb32084b94bbf4324d47acc9991419c2775dc4038fff19950e/calibur-0.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e6/7f/bbd4dcf0faf61bc68a01939256e2ed02d681e9334c1a3cef24d5f77aba9f/fastapi-0.115.7-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2b/16/b911d4c40eddeed8ffe195763f23fb68867210b4e347ed968ea45d2c9d4f/fastcore-1.7.28-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/53/5d/65f40bd333463b3230b3a72d93873caaf49b0cbb5228598fafb75fcc5357/ffmpy-0.5.0-py3-none-any.whl
@@ -2247,14 +2244,6 @@ packages:
   purls: []
   size: 978868
   timestamp: 1733790976384
-- pypi: https://files.pythonhosted.org/packages/ba/d6/b3046c86cdbb32084b94bbf4324d47acc9991419c2775dc4038fff19950e/calibur-0.0.1-py3-none-any.whl
-  name: calibur
-  version: 0.0.1
-  sha256: 5acf81fb08cbbbaf245854895b17f2bc07ce52edc7b41a480fa9546de480e705
-  requires_dist:
-  - numpy
-  - typing-extensions
-  requires_python: ~=3.7
 - conda: https://prefix.dev/conda-forge/noarch/casefy-1.0.0-pyhd8ed1ab_0.conda
   sha256: 45b5af8a38f257fae674f31587893dfb935ecce166aa26cf46214a5dcabec395
   md5: b0b47de541d536d629026713069fb5d4
@@ -5772,12 +5761,10 @@ packages:
   requires_python: '>=3.7'
 - pypi: .
   name: monopriors
-  version: 0.2.0
-  sha256: f1c85dc72dccaff666304996d5b36693e0a218a8f6f72e84d012b200a7774345
+  version: 0.3.0
+  sha256: 822dce4670e2f50c1c742a6220be49068b7c94acf39f175f38c9e9df415354c4
   requires_dist:
-  - opencv-python
   - geffnet>=1.0.2
-  - calibur>=0.0.1
   - omnidata-tools>=0.0.23
   - hf-transfer>=0.1.6
   - mmcv-lite>=2.2.0
