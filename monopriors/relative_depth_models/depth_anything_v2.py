@@ -58,7 +58,7 @@ class DepthAnythingV2Predictor(BaseRelativePredictor):
         )
         state_dict = torch.load(filepath, map_location="cpu")
         self.model.load_state_dict(state_dict)
-        self.model = self.model.to(device).eval()
+        self.model: DepthAnythingV2 = self.model.to(device).eval()
         print(f"DepthAnythingV2 model loaded. Time: {timer() - start:.2f}s")
 
     def __call__(
