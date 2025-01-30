@@ -19,8 +19,12 @@ class PromptDA(nn.Module):
 
         self.encoder = encoder
         self.model_config = model_config
+        # get current working directory using pathlib
+        file_dir = Path(__file__).parent
+        dinov2_path = file_dir / "torchhub/facebookresearch_dinov2_main"
+        assert dinov2_path.exists(), "torchub path not found"
         self.pretrained = torch.hub.load(
-            "monopriors/third_party/promptda/torchhub/facebookresearch_dinov2_main",
+            str(dinov2_path),
             "dinov2_{:}14".format(encoder),
             source="local",
             pretrained=False,
