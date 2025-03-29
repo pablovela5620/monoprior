@@ -1,11 +1,9 @@
-from jaxtyping import Float32, Int64, Bool
 import numpy as np
 from einops import rearrange
+from jaxtyping import Bool, Float32, Int64
 
 
-def estimate_intrinsics(
-    H: int, W: int, fov: float = 55.0
-) -> Float32[np.ndarray, "3 3"]:
+def estimate_intrinsics(H: int, W: int, fov: float = 55.0) -> Float32[np.ndarray, "3 3"]:
     """
     Intrinsics for a pinhole camera model from image dimensions.
     Assume fov of 55 degrees and central principal point.
@@ -13,9 +11,7 @@ def estimate_intrinsics(
     f = 0.5 * W / np.tan(0.5 * fov * np.pi / 180.0)
     cx = 0.5 * W
     cy = 0.5 * H
-    K_33: Float32[np.ndarray, "3 3"] = np.array(
-        [[f, 0, cx], [0, f, cy], [0, 0, 1]], dtype=np.float32
-    )
+    K_33: Float32[np.ndarray, "3 3"] = np.array([[f, 0, cx], [0, f, cy], [0, 0, 1]], dtype=np.float32)
     return K_33
 
 
@@ -26,9 +22,7 @@ def disparity_to_depth(
     disparity_max: float = float(disparity.max())
     min_disparity_range: float = disparity_max / range
 
-    depth: Float32[np.ndarray, "h w"] = (focal_length * baseline) / np.maximum(
-        disparity, min_disparity_range
-    )
+    depth: Float32[np.ndarray, "h w"] = (focal_length * baseline) / np.maximum(disparity, min_disparity_range)
     # gamma correction for better visualizationg
     depth: Float32[np.ndarray, "h w"] = np.power(depth, 1.0 / 2.2)
     return depth
@@ -41,9 +35,7 @@ def depth_to_disparity(
     return disparity
 
 
-def depth_edges_mask(
-    depth: Float32[np.ndarray, "h w"], threshold: float = 0.1
-) -> Bool[np.ndarray, "h w"]:
+def depth_edges_mask(depth: Float32[np.ndarray, "h w"], threshold: float = 0.1) -> Bool[np.ndarray, "h w"]:
     """Returns a mask of edges in the depth map.
     Args:
     depth: 2D numpy array of shape (H, W) with dtype float32.
@@ -82,21 +74,15 @@ def depth_to_points(
     coord: Float32[np.ndarray, "1 h w 3"] = rearrange(coord, "h w c -> 1 h w c")
 
     # from depth to 3D points
-    depth_1hw11: Float32[np.ndarray, "1 h w 1 1"] = rearrange(
-        depth_1hw, "1 h w -> 1 h w 1 1"
-    )
+    depth_1hw11: Float32[np.ndarray, "1 h w 1 1"] = rearrange(depth_1hw, "1 h w -> 1 h w 1 1")
 
     # back project points from pixels to camera coordinate system
-    pts3D_1 = (
-        depth_1hw11
-        * rearrange(K_33_inv, "h w -> 1 1 1 h w")
-        @ rearrange(coord, "1 h w c -> 1 h w c 1")
-    )
+    pts3D_1 = depth_1hw11 * rearrange(K_33_inv, "h w -> 1 1 1 h w") @ rearrange(coord, "1 h w c -> 1 h w c 1")
 
     # transform from camera to world coordinate system
-    pts3D_2: Float32[np.ndarray, "1 h w 3 1"] = rearrange(
-        R, "h w -> 1 1 1 h w"
-    ) @ pts3D_1 + rearrange(t, "s -> 1 1 1 s 1")
+    pts3D_2: Float32[np.ndarray, "1 h w 3 1"] = rearrange(R, "h w -> 1 1 1 h w") @ pts3D_1 + rearrange(
+        t, "s -> 1 1 1 s 1"
+    )
 
     # rearrange to 3D points
     pointcloud: Float32[np.ndarray, "h w 3"] = rearrange(pts3D_2, "1 h w c 1 -> h w c")

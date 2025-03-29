@@ -13,6 +13,17 @@
             ]
         },
         {
+            "name": "VDA Inference",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/run_video_da.py",
+            "console": "integratedTerminal",
+            // "args": [
+            //     "--zip-path",
+            //     "data/example-room-scan-poly.zip",
+            // ]
+        },
+        {
             "name": "Gradio App",
             "type": "debugpy",
             "request": "launch",

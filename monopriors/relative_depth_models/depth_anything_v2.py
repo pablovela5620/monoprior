@@ -1,14 +1,16 @@
-from typing import Literal
-import torch
-import numpy as np
-from jaxtyping import Float, UInt8
 from timeit import default_timer as timer
-from huggingface_hub import hf_hub_download
-from monopriors.depth_utils import estimate_intrinsics, disparity_to_depth
-from monopriors.third_party.depth_anything_v2.dpt import DepthAnythingV2
+from typing import Literal
+
 import cv2
-from jaxtyping import Float32
-from .base_relative_depth import RelativeDepthPrediction, BaseRelativePredictor
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from jaxtyping import Float, Float32, UInt8
+
+from monopriors.depth_utils import disparity_to_depth, estimate_intrinsics
+from monopriors.third_party.depth_anything_v2.dpt import DepthAnythingV2
+
+from .base_relative_depth import BaseRelativePredictor, RelativeDepthPrediction
 
 model_configs = {
     "vits": {
