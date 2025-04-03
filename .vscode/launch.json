@@ -13,6 +13,19 @@
             ]
         },
         {
+            "name": "VGGT Inference",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/run_multiview_depth.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--confidence-threshold",
+                "30",
+                "--image-dir",
+                "data/portrait_img/"
+            ]
+        },
+        {
             "name": "VDA Inference",
             "type": "debugpy",
             "request": "launch",

@@ -1,15 +1,16 @@
-from typing import Literal
-import torch
-import numpy as np
-from jaxtyping import Float, UInt8, Float32
 from timeit import default_timer as timer
-from monopriors.metric_depth_models.base_metric_depth import (
-    MetricDepthPrediction,
-    BaseMetricPredictor,
-)
-from einops import rearrange
+from typing import Literal, TypedDict
+
 import cv2
-from typing import TypedDict
+import numpy as np
+import torch
+from einops import rearrange
+from jaxtyping import Float, Float32, UInt8
+
+from monopriors.metric_depth_models.base_metric_depth import (
+    BaseMetricPredictor,
+    MetricDepthPrediction,
+)
 
 
 class Metric3DPredictionDict(TypedDict):
@@ -34,11 +35,7 @@ class Metric3DPredictor(BaseMetricPredictor):
         self.device = device
         print("Loading Relative Metric3D model...")
         start = timer()
-        self.model = (
-            torch.hub.load("yvanyin/metric3d", "metric3d_vit_small", pretrain=True)
-            .to(device)
-            .eval()
-        )
+        self.model = torch.hub.load("yvanyin/metric3d", "metric3d_vit_small", pretrain=True).to(device).eval()
         print(f"Metric3D model loaded. Time: {timer() - start:.2f}s")
 
         # only for VIT models
@@ -59,44 +56,28 @@ class Metric3DPredictor(BaseMetricPredictor):
             rgb, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_LINEAR
         )
 
-        k33_rescaled: Float[np.ndarray, "3 3"] | None = (
-            K_33 * scale if K_33 is not None else None
-        )
+        k33_rescaled: Float[np.ndarray, "3 3"] | None = K_33 * scale if K_33 is not None else None
 
         rgb_padded: UInt8[np.ndarray, "616 1064 3"]
         pad_info: list[int]
         rgb_padded, pad_info = self.pad_rgb(rgb_rescaled)
 
         ##### normalize
-        mean: Float32[torch.Tensor, "c 1 1"] = rearrange(
-            torch.tensor([123.675, 116.28, 103.53]), "c -> c 1 1"
-        )
-        std: Float32[torch.Tensor, "c 1 1"] = rearrange(
-            torch.tensor([58.395, 57.12, 57.375]), "c -> c 1 1"
-        )
+        mean: Float32[torch.Tensor, "c 1 1"] = rearrange(torch.tensor([123.675, 116.28, 103.53]), "c -> c 1 1")
+        std: Float32[torch.Tensor, "c 1 1"] = rearrange(torch.tensor([58.395, 57.12, 57.375]), "c -> c 1 1")
         rgb_tensor_hwc: UInt8[torch.Tensor, "616 1064 c"] = torch.from_numpy(rgb_padded)
-        rgb_tensor_bchw: Float32[torch.Tensor, "b c 616 1064"] = rearrange(
-            rgb_tensor_hwc.float(), "h w c -> 1 c h w"
-        )
-        rgb_tensor_bchw: Float32[torch.Tensor, "b c 616 1064"] = (
-            rgb_tensor_bchw - mean
-        ) / std
-        rgb_tensor_bchw: Float32[torch.Tensor, "b c 616 1064"] = rgb_tensor_bchw.to(
-            self.device
-        )
+        rgb_tensor_bchw: Float32[torch.Tensor, "b c 616 1064"] = rearrange(rgb_tensor_hwc.float(), "h w c -> 1 c h w")
+        rgb_tensor_bchw: Float32[torch.Tensor, "b c 616 1064"] = (rgb_tensor_bchw - mean) / std
+        rgb_tensor_bchw: Float32[torch.Tensor, "b c 616 1064"] = rgb_tensor_bchw.to(self.device)
 
         with torch.no_grad():
             pred_depth_b1hw: Float32[torch.Tensor, "b 1 616 1064"]
             confidence_b1hw: Float32[torch.Tensor, "b 1 616 1064"]
             output_dict: Metric3DPredictionDict
-            pred_depth_b1hw, confidence_b1hw, output_dict = self.model.inference(
-                {"input": rgb_tensor_bchw}
-            )
+            pred_depth_b1hw, confidence_b1hw, output_dict = self.model.inference({"input": rgb_tensor_bchw})
 
         # un pad
-        pred_depth_hw: Float32[torch.Tensor, "616 1064"] = rearrange(
-            pred_depth_b1hw, "1 1 h w -> h w"
-        )
+        pred_depth_hw: Float32[torch.Tensor, "616 1064"] = rearrange(pred_depth_b1hw, "1 1 h w -> h w")
         pred_depth_hw: Float32[torch.Tensor, "_ _"] = pred_depth_hw[
             pad_info[0] : pred_depth_hw.shape[0] - pad_info[1],
             pad_info[2] : pred_depth_hw.shape[1] - pad_info[3],
@@ -132,9 +113,7 @@ class Metric3DPredictor(BaseMetricPredictor):
 
         return metric_pred
 
-    def pad_rgb(
-        self, rgb_resized: UInt8[np.ndarray, "_ _ 3"]
-    ) -> tuple[UInt8[np.ndarray, "616 1064 3"], list[int]]:
+    def pad_rgb(self, rgb_resized: UInt8[np.ndarray, "_ _ 3"]) -> tuple[UInt8[np.ndarray, "616 1064 3"], list[int]]:
         h_new, w_new, _ = rgb_resized.shape
         pad_h = self.input_height - h_new
         pad_w = self.input_width - w_new

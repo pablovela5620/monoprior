@@ -12,6 +12,7 @@ dependencies = [
     "timm>=1.0.15,<2",
     "pytorch-lightning>=2.5.1,<3",
     "transformers",
+    "diffusers[torch]>=0.32.2,<0.33",
     # pypi only
 
 ]
@@ -22,6 +23,8 @@ include = ["monopriors*", "tools*"]
 [tool.pixi.project]
 channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64"]
+requires-pixi = ">=0.40"
+
 
 [tool.pixi.activation]
 scripts = [".pixi.sh"]
@@ -113,6 +116,7 @@ torch = { version = ">=2.5.1", index = "https://download.pytorch.org/whl/cu124" 
 torchvision = { version = ">=0.20.1", index = "https://download.pytorch.org/whl/cu124" }
 # unidepth requires 0.0.28.post3 for NystromAttention, maybe remove UniDepth?
 xformers = { version = "==0.0.28.post3", index = "https://download.pytorch.org/whl/cu124" }
+vggt = { git = "https://github.com/facebookresearch/vggt.git", rev = "b02cc03ceee70821ed1231a530c1992507ef9862" }
 
 [tool.pixi.feature.app.dependencies]
 gradio = "<5"

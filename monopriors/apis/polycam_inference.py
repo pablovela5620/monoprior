@@ -92,7 +92,7 @@ def polycam_inference(config: PolycamConfig) -> None:
     pred_fuser = Open3DFuser()
 
     parent_path: Path = Path("world")
-    rr.log(f"{parent_path}", rr.ViewCoordinates.RUB, timeless=True)
+    rr.log(f"{parent_path}", rr.ViewCoordinates.RUB, static=True)
 
     pbar = tqdm(polycam_dataset, total=len(polycam_dataset))
     polycam_data: PolycamData
@@ -100,15 +100,11 @@ def polycam_inference(config: PolycamConfig) -> None:
         rr.set_time_sequence("timestep", idx)
         rgb_hw3: UInt8[np.ndarray, "h w 3"] = polycam_data.rgb_hw3
         pinhole_params: PinholeParameters = polycam_data.pinhole_params
-        K_33: Float32[np.ndarray, "3 3"] = pinhole_params.intrinsics.k_matrix.astype(
-            np.float32
-        )
+        K_33: Float32[np.ndarray, "3 3"] = pinhole_params.intrinsics.k_matrix.astype(np.float32)
 
         pred: MonoPriorPrediction = model.__call__(rgb_hw3, K_33)
         # convert to mm and Uint16
-        pred_depth_hw: UInt16[np.ndarray, "h w"] = (
-            pred.metric_pred.depth_meters * 1000
-        ).astype(np.uint16)
+        pred_depth_hw: UInt16[np.ndarray, "h w"] = (pred.metric_pred.depth_meters * 1000).astype(np.uint16)
 
         gt_fuser.fuse_frames(
             polycam_data.depth_hw,

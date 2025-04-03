@@ -1,18 +1,20 @@
 import os
 from typing import Literal
-import torch
+
 import numpy as np
+import torch
+import torch.nn.functional as F
+from einops import rearrange
 from jaxtyping import Float, UInt8
 from torchvision import transforms
-import torch.nn.functional as F
-from monopriors.third_party.dsine.dsine import DSINE
-from monopriors.third_party.dsine.dsine_kappa import DSINE_v02_kappa
-from monopriors.third_party.dsine.utils.utils import get_intrins_from_fov, pad_input
+
 from monopriors.surface_normal_models.base_normal_model import (
     BaseNormalPredictor,
     SurfaceNormalPrediction,
 )
-from einops import rearrange
+from monopriors.third_party.dsine.dsine import DSINE
+from monopriors.third_party.dsine.dsine_kappa import DSINE_v02_kappa
+from monopriors.third_party.dsine.utils.utils import get_intrins_from_fov, pad_input
 
 
 class DSineNormalPredictor(BaseNormalPredictor):
@@ -22,19 +24,12 @@ class DSineNormalPredictor(BaseNormalPredictor):
         model_type: Literal["dsine", "dsine_kappa"] = "dsine_kappa",
     ):
         self.device = device
-        self.transform = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        )
+        self.transform = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         self.model = self.load_model(model_type=model_type)
 
     def load_model(self, model_type: Literal["dsine", "dsine_kappa"]):
-        state_dict = self._load_state_dict(
-            local_file_path="checkpoints/dsine_kappa.pt", model_type=model_type
-        )
-        if model_type == "dsine":
-            model = DSINE()
-        else:
-            model = DSINE_v02_kappa()
+        state_dict = self._load_state_dict(local_file_path="checkpoints/dsine_kappa.pt", model_type=model_type)
+        model = DSINE() if model_type == "dsine" else DSINE_v02_kappa()
 
         model.load_state_dict(state_dict, strict=True)
         model.eval()
@@ -55,13 +50,11 @@ class DSineNormalPredictor(BaseNormalPredictor):
             # Load state_dict from the default URL
             file_name = "dsine.pt" if model_type == "dsine" else "dsine_kappa.pt"
             url = (
-                f"https://huggingface.co/camenduru/DSINE/resolve/main/dsine.pt"
+                "https://huggingface.co/camenduru/DSINE/resolve/main/dsine.pt"
                 if model_type == "dsine"
-                else f"https://huggingface.co/pablovela5620/dsine_kappa/resolve/main/dsine_kappa.pt"
+                else "https://huggingface.co/pablovela5620/dsine_kappa/resolve/main/dsine_kappa.pt"
             )
-            state_dict = torch.hub.load_state_dict_from_url(
-                url, file_name=file_name, map_location=torch.device("cpu")
-            )
+            state_dict = torch.hub.load_state_dict_from_url(url, file_name=file_name, map_location=torch.device("cpu"))
 
         return state_dict["model"]
 
@@ -70,9 +63,7 @@ class DSineNormalPredictor(BaseNormalPredictor):
     ) -> SurfaceNormalPrediction:
         # preprocess the input image
         rgb: Float[np.ndarray, "h w 3"] = rgb.astype(np.float32) / 255.0
-        rgb: Float[torch.Tensor, "1 c h w"] = torch.from_numpy(
-            rearrange(rgb, "h w c -> 1 c h w")
-        ).to(self.device)
+        rgb: Float[torch.Tensor, "1 c h w"] = torch.from_numpy(rearrange(rgb, "h w c -> 1 c h w")).to(self.device)
 
         _, _, h, w = rgb.shape
 
@@ -82,9 +73,7 @@ class DSineNormalPredictor(BaseNormalPredictor):
         rgb = self.transform(rgb)
 
         if K_33 is None:
-            K_33: Float[torch.Tensor, "3 3"] = get_intrins_from_fov(
-                new_fov=60.0, H=h, W=w, device=self.device
-            )
+            K_33: Float[torch.Tensor, "3 3"] = get_intrins_from_fov(new_fov=60.0, H=h, W=w, device=self.device)
             K_b33: Float[torch.Tensor, "b 3 3"] = rearrange(K_33, "r c -> 1 r c")
         else:
             K_b33 = torch.from_numpy(rearrange(K_33, "r c -> 1 r c")).to(self.device)
@@ -96,13 +85,11 @@ class DSineNormalPredictor(BaseNormalPredictor):
         with torch.no_grad():
             normal_list: list[torch.Tensor] = self.model(rgb, intrins=K_b33)
             # last value in the list is the normal map
-            normal_bchw: (
-                Float[torch.Tensor, "b 3 _ _"] | Float[torch.Tensor, "b 4 _ _"]
-            ) = normal_list[-1]
+            normal_bchw: Float[torch.Tensor, "b 3 _ _"] | Float[torch.Tensor, "b 4 _ _"] = normal_list[-1]
             # undo padding
-            normal_bchw: (
-                Float[torch.Tensor, "b 3 _ _"] | Float[torch.Tensor, "b 4 _ _"]
-            ) = normal_bchw[:, :, top : top + h, left : left + w]
+            normal_bchw: Float[torch.Tensor, "b 3 _ _"] | Float[torch.Tensor, "b 4 _ _"] = normal_bchw[
+                :, :, top : top + h, left : left + w
+            ]
 
             normal_b3hw: Float[torch.Tensor, "b 3 h w"]
             conf_b1hw: Float[torch.Tensor, "b 1 h w"] | None
