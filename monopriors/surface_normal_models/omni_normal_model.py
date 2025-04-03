@@ -1,39 +1,31 @@
 from pathlib import Path
 from typing import Literal
-import torch
+
 import numpy as np
-from jaxtyping import Float, UInt8
+import torch
 import torchvision.transforms.functional as TF
+from einops import rearrange
+from jaxtyping import Float, UInt8
 from omnidata_tools.torch.modules.midas.dpt_depth import DPTDepthModel
+
 from monopriors.surface_normal_models.base_normal_model import (
     BaseNormalPredictor,
     SurfaceNormalPrediction,
 )
-from einops import rearrange
 
 
 class OmniNormalPredictor(BaseNormalPredictor):
-    def __init__(
-        self, device: Literal["cpu", "cuda"], omnidata_pretrained_weights_path: Path
-    ) -> None:
+    def __init__(self, device: Literal["cpu", "cuda"], omnidata_pretrained_weights_path: Path) -> None:
         self.device = device
         self.model = self._load_model(omnidata_pretrained_weights_path)
         self.image_size = 384
 
     def _load_model(self, omnidata_pretrained_weights_path: Path):
         model = DPTDepthModel(backbone="vitb_rn50_384", num_channels=3)  # DPT Hybrid
-        omnidata_pretrained_weights_path = (
-            omnidata_pretrained_weights_path / "omnidata_dpt_normal_v2.ckpt"
-        )
+        omnidata_pretrained_weights_path = omnidata_pretrained_weights_path / "omnidata_dpt_normal_v2.ckpt"
         assert omnidata_pretrained_weights_path.exists(), "Weights not found"
-        map_location = (
-            (lambda storage, loc: storage.cuda())
-            if torch.cuda.is_available()
-            else torch.device("cpu")
-        )
-        checkpoint = torch.load(
-            omnidata_pretrained_weights_path, map_location=map_location
-        )
+        map_location = (lambda storage, loc: storage.cuda()) if torch.cuda.is_available() else torch.device("cpu")
+        checkpoint = torch.load(omnidata_pretrained_weights_path, map_location=map_location)
 
         if "state_dict" in checkpoint:
             state_dict = {}

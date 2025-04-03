@@ -1,13 +1,15 @@
-from typing import Literal
-import torch
-import numpy as np
-from jaxtyping import Float, UInt8
 from timeit import default_timer as timer
-from monopriors.metric_depth_models.base_metric_depth import (
-    MetricDepthPrediction,
-    BaseMetricPredictor,
-)
+from typing import Literal
+
+import numpy as np
+import torch
 from einops import rearrange
+from jaxtyping import Float, UInt8
+
+from monopriors.metric_depth_models.base_metric_depth import (
+    BaseMetricPredictor,
+    MetricDepthPrediction,
+)
 
 
 class UniDepthMetricPredictor(BaseMetricPredictor):
@@ -28,6 +30,7 @@ class UniDepthMetricPredictor(BaseMetricPredictor):
                 backbone=backbone,
                 pretrained=True,
                 trust_repo=True,
+                force_reload=True,
             )
             .to(device)
             .eval()

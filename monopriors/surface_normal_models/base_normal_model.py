@@ -1,14 +1,15 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from jaxtyping import Float, UInt8
 from typing import Literal
+
 import numpy as np
+from jaxtyping import Float, UInt8
 
 
 @dataclass
 class SurfaceNormalPrediction:
     normal_hw3: Float[np.ndarray, "h w 3"]
-    # surface normal prediction
+    # surface normal prediction TODO make into a consistent coordinate system
     confidence_hw1: Float[np.ndarray, "h w 1"]
     # confidence values
 

@@ -1,27 +1,26 @@
+from dataclasses import dataclass
+from pathlib import Path
+
+import cv2
+import numpy as np
+import rerun as rr
+from jaxtyping import UInt8, UInt16
+from numpy import ndarray
+from simplecv.camera_parameters import Intrinsics, rescale_intri
+from simplecv.data.polycam import (
+    DepthConfidenceLevel,
+    PolycamData,
+    PolycamDataset,
+    load_polycam_data,
+)
+from simplecv.ops.tsdf_depth_fuser import Open3DFuser
+from simplecv.rerun_log_utils import RerunTyroConfig, log_pinhole
 from tqdm import tqdm
+
 from monopriors.depth_completion_models.base_completion_depth import (
     CompletionDepthPrediction,
 )
-
 from monopriors.depth_completion_models.prompt_da import PromptDAPredictor
-import rerun as rr
-
-from dataclasses import dataclass
-from pathlib import Path
-from simplecv.rerun_log_utils import RerunTyroConfig
-from simplecv.data.polycam import (
-    PolycamDataset,
-    load_polycam_data,
-    PolycamData,
-    DepthConfidenceLevel,
-)
-from simplecv.camera_parameters import Intrinsics, rescale_intri
-from simplecv.rerun_log_utils import log_pinhole
-from simplecv.ops.tsdf_depth_fuser import Open3DFuser
-from jaxtyping import UInt8, UInt16
-from numpy import ndarray
-import numpy as np
-import cv2
 
 
 @dataclass
@@ -86,16 +85,12 @@ def pda_polycam_inference(
 ) -> None:
     parent_path: Path = Path("world")
     rr.log("/", rr.ViewCoordinates.RUB, timeless=True)
-    polycam_dataset: PolycamDataset = load_polycam_data(
-        polycam_zip_or_directory_path=config.polycam_zip_path
-    )
+    polycam_dataset: PolycamDataset = load_polycam_data(polycam_zip_or_directory_path=config.polycam_zip_path)
 
     max_depth_meter: float = 4.0
     pred_fuser = Open3DFuser(fusion_resolution=0.04, max_fusion_depth=max_depth_meter)
 
-    model = PromptDAPredictor(
-        device="cuda", model_type="large", max_size=config.max_size
-    )
+    model = PromptDAPredictor(device="cuda", model_type="large", max_size=config.max_size)
     pbar = tqdm(polycam_dataset, desc="Inferring", total=len(polycam_dataset))
     polycam_data: PolycamData
     for frame_idx, polycam_data in enumerate(pbar):
