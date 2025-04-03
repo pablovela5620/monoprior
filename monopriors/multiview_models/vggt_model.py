@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from timeit import default_timer as timer
-from typing import Literal
+from typing import Literal, TypedDict
 
 import cv2
 import numpy as np
@@ -18,6 +18,14 @@ from torchvision import transforms as TF
 from vggt.models.vggt import VGGT
 from vggt.utils.geometry import unproject_depth_map_to_point_map
 from vggt.utils.pose_enc import pose_encoding_to_extri_intri
+
+
+class PreprocessingMetadata(TypedDict):
+    original_size: tuple[int, int]  # (width, height)
+    mode: Literal["crop", "pad"]  # Processing mode
+    target_size: int  # Target width (usually 518px)
+    padding: dict[Literal["top", "left", "right", "bottom"], int]  # Padding values
+    new_size: tuple[int, int]  # (width, height) after resizing
 
 
 @serde(deny_unknown_fields=True)
@@ -57,15 +65,19 @@ class VGGTPredictions:
 def preprocess_images(
     rgb_list: list[UInt8[ndarray, "H W 3"]],
     mode: Literal["crop", "pad"] = "crop",
-) -> Float32[torch.Tensor, "N 3 H W"]:
+) -> tuple[Float32[torch.Tensor, "N 3 H W"], list[PreprocessingMetadata]]:
     """
     A quick start function to preprocess images for model input.
 
     Args:
         rgb_list (list): List of RGB images as numpy arrays
+        mode (str): Processing mode, either "crop" or "pad"
 
     Returns:
-        torch.Tensor: Batched tensor of preprocessed images with shape (N, 3, H, W)
+        tuple: (
+            torch.Tensor: Batched tensor of preprocessed images with shape (N, 3, H, W),
+            list: List of preprocessing metadata dictionaries for each image
+        )
 
     Raises:
         ValueError: If the input list is empty
@@ -80,67 +92,81 @@ def preprocess_images(
     if len(rgb_list) == 0:
         raise ValueError("At least 1 image is required")
 
-    # Disable pad mode for now
-    if mode == "pad":
-        raise NotImplementedError(
-            "Pad mode is currently not fully supported due to issues with post-processing padded outputs. "
-            "Please use 'crop' mode instead."
-        )
-
     images = []
     shapes = set()
     to_tensor = TF.ToTensor()
     target_size = 518
+    metadata_list: list[PreprocessingMetadata] = []
 
     # First process all images and collect their shapes
     for rgb in rgb_list:
         # Convert the numpy array to PIL Image to ensure identical processing
         pil_img = Image.fromarray(rgb)
+        original_width, original_height = pil_img.size
 
-        width, height = pil_img.size
+        # Initialize metadata as TypedDict with explicit constructor
+        metadata = PreprocessingMetadata(
+            original_size=(original_width, original_height),
+            mode=mode,
+            target_size=target_size,
+            padding={"top": 0, "left": 0, "right": 0, "bottom": 0},
+            new_size=(0, 0),  # Will be filled later
+        )
+
         if mode == "pad":
             # Make the largest dimension 518px while maintaining aspect ratio
-            if width >= height:
+            if original_width >= original_height:
                 new_width = target_size
-                new_height: int = round(height * (new_width / width) / 14) * 14  # Make divisible by 14
+                new_height = round(original_height * (new_width / original_width) / 14) * 14  # Make divisible by 14
             else:
                 new_height = target_size
-                new_width: int = round(width * (new_height / height) / 14) * 14  # Make divisible by 14
+                new_width = round(original_width * (new_height / original_height) / 14) * 14  # Make divisible by 14
+
+            metadata["new_size"] = (new_width, new_height)
+            # Calculate padding
+            pad_top = (target_size - new_height) // 2
+            pad_bottom = target_size - new_height - pad_top
+            pad_left = (target_size - new_width) // 2
+            pad_right = target_size - new_width - pad_left
+
+            metadata["padding"] = {"top": pad_top, "bottom": pad_bottom, "left": pad_left, "right": pad_right}
+
+            # Resize with new dimensions using PIL's BICUBIC
+            pil_img = pil_img.resize((new_width, new_height), Image.BICUBIC)
+
+            # Convert to tensor
+            img = to_tensor(pil_img)
+
+            # Apply padding
+            img = torch.nn.functional.pad(
+                img,
+                (pad_left, pad_right, pad_top, pad_bottom),
+                mode="constant",
+                value=1.0,
+            )
         else:  # mode == "crop"
-            # Original behavior: set width to 518px
+            # Original behavior: set width to target_size
             new_width = target_size
             # Calculate height maintaining aspect ratio, divisible by 14
-            new_height = round(height * (new_width / width) / 14) * 14
+            new_height = round(original_height * (new_width / original_width) / 14) * 14
+            metadata["new_size"] = (new_width, new_height)
 
-        # Resize with new dimensions using PIL's BICUBIC for exact matching
-        pil_img = pil_img.resize((new_width, new_height), Image.BICUBIC)
+            # Resize with new dimensions using PIL's BICUBIC for exact matching
+            pil_img = pil_img.resize((new_width, new_height), Image.BICUBIC)
 
-        # Convert to tensor using the same to_tensor transform
-        img = to_tensor(pil_img)  # Convert to tensor (0, 1)
+            # Convert to tensor using the same to_tensor transform
+            img = to_tensor(pil_img)  # Convert to tensor (0, 1)
 
-        # Center crop height if it's larger than 518 (only in crop mode)
-        if mode == "crop" and new_height > target_size:
-            start_y = (new_height - target_size) // 2
-            img = img[:, start_y : start_y + target_size, :]
-
-        # For pad mode, pad to make a square of target_size x target_size
-        if mode == "pad":
-            h_padding = target_size - img.shape[1]
-            w_padding = target_size - img.shape[2]
-
-            if h_padding > 0 or w_padding > 0:
-                pad_top = h_padding // 2
-                pad_bottom = h_padding - pad_top
-                pad_left = w_padding // 2
-                pad_right = w_padding - pad_left
-
-                # Pad with white (value=1.0)
-                img = torch.nn.functional.pad(
-                    img, (pad_left, pad_right, pad_top, pad_bottom), mode="constant", value=1.0
-                )
+            # Center crop height if it's larger than target_size
+            if new_height > target_size:
+                start_y = (new_height - target_size) // 2
+                metadata["padding"]["top"] = -start_y  # Negative value indicates cropping
+                img = img[:, start_y : start_y + target_size, :]
+                metadata["new_size"] = (new_width, target_size)
 
         shapes.add((img.shape[1], img.shape[2]))
         images.append(img)
+        metadata_list.append(metadata)
 
     # Check if we have different shapes
     if len(shapes) > 1:
@@ -151,7 +177,7 @@ def preprocess_images(
 
         # Pad images if necessary
         padded_images = []
-        for img in images:
+        for i, img in enumerate(images):
             h_padding = max_height - img.shape[1]
             w_padding = max_width - img.shape[2]
 
@@ -160,6 +186,12 @@ def preprocess_images(
                 pad_bottom = h_padding - pad_top
                 pad_left = w_padding // 2
                 pad_right = w_padding - pad_left
+
+                # Update metadata with additional padding
+                metadata_list[i]["padding"]["top"] += pad_top
+                metadata_list[i]["padding"]["bottom"] += pad_bottom
+                metadata_list[i]["padding"]["left"] += pad_left
+                metadata_list[i]["padding"]["right"] += pad_right
 
                 img = torch.nn.functional.pad(
                     img,
@@ -176,41 +208,40 @@ def preprocess_images(
     if len(rgb_list) == 1 and images.dim() == 3:
         images = images.unsqueeze(0)
 
-    return images
+    return images, metadata_list
 
 
 def remove_padding_from_prediction(
-    padded_rgb: np.ndarray,
-    original_size: tuple[int, int],  # (width, height)
-    target_size: int = 518,
+    pred: np.ndarray,
+    metadata: PreprocessingMetadata,
 ) -> np.ndarray:
     """
-    Crop out the padding from a prediction that was produced in pad mode.
+    Remove padding from a prediction tensor based on preprocessing metadata.
 
     Args:
-        pred (torch.Tensor): The prediction tensor with shape (..., target_size, target_size).
-        original_size (tuple[int, int]): Original (width, height) of the image.
-        target_size (int): The size used during preprocessing (default 518).
+        pred: The prediction tensor/array with padding
+        metadata: Dictionary containing padding information
 
     Returns:
-        torch.Tensor: The cropped tensor corresponding to the resized image.
+        The unpadded array/tensor
     """
-    width, height = original_size
-    # Compute new dimensions using the same logic as in preprocessing:
-    if width >= height:
-        new_width = target_size
-        new_height = round(height * (target_size / width) / 14) * 14
-    else:
-        new_height = target_size
-        new_width = round(width * (target_size / height) / 14) * 14
+    # Get padding values
+    pad_top = metadata["padding"]["top"]
+    pad_left = metadata["padding"]["left"]
+    new_width, new_height = metadata["new_size"]
 
-    # Determine the padding applied during preprocessing
-    pad_top = (target_size - new_height) // 2
-    pad_left = (target_size - new_width) // 2
-
-    # Crop out the padded borders
-    cropped_rgb = padded_rgb[..., pad_top : pad_top + new_height, pad_left : pad_left + new_width]
-    return cropped_rgb
+    if metadata["mode"] == "pad":
+        # For pad mode, we need to crop out the padding
+        if pred.ndim == 2:  # For 2D arrays like depth maps or masks
+            return pred[pad_top : pad_top + new_height, pad_left : pad_left + new_width]
+        elif pred.ndim == 3:  # For RGB images (H, W, C)
+            return pred[pad_top : pad_top + new_height, pad_left : pad_left + new_width, :]
+        else:
+            raise ValueError(f"Unsupported tensor dimension: {pred.ndim}")
+    else:  # For crop mode
+        # In crop mode, padding values are used differently and might be negative
+        # But we generally don't need to uncrop - we just need to resize later
+        return pred
 
 
 @dataclass
@@ -241,11 +272,12 @@ def generate_multiview_pred(
     img_tensors: Float32[Tensor, "num_img 3 resized_h resized_w"],
     rgb_list: list[UInt8[ndarray, "original_h original_w 3"]],
     confidence_threshold: int | float,
+    metadata_list: list[PreprocessingMetadata] | None = None,
 ) -> list[MultiviewPred]:
     pred_class = pred_class.remove_batch_dim_if_one()
     assert len(pred_class.cam_T_world.shape) == 3, "Currently batch size of 1 is only supported"
 
-    # Generate world points from depth map,this is usually more accurate than the world points from pose encoding
+    # Generate world points from depth map, this is usually more accurate than the world points from pose encoding
     depth_maps: Float32[ndarray, "num_cams resized_h resized_w 1"] = pred_class.depth
     world_points: Float32[ndarray, "num_cams resized_h resized_w 3"] = unproject_depth_map_to_point_map(
         depth_maps, pred_class.cam_T_world, pred_class.intrinsic
@@ -258,6 +290,39 @@ def generate_multiview_pred(
         processed_imgs,
         "num_cams C resized_h resized_w -> num_cams resized_h resized_w C",
     )
+
+    # Process each image's data first - remove padding if metadata is available
+    if metadata_list:
+        unpadded_depth_maps = []
+        unpadded_world_points = []
+        unpadded_processed_imgs = []
+        unpadded_depth_confs = []
+
+        for i in range(len(processed_imgs)):
+            # Remove padding from depths, world points, processed images, and confidence maps
+            unpadded_depth_maps.append(remove_padding_from_prediction(depth_maps[i], metadata_list[i]))
+            unpadded_world_points.append(remove_padding_from_prediction(world_points[i], metadata_list[i]))
+            unpadded_processed_imgs.append(remove_padding_from_prediction(processed_imgs[i], metadata_list[i]))
+            unpadded_depth_confs.append(remove_padding_from_prediction(pred_class.depth_conf[i], metadata_list[i]))
+
+            # Also need to update camera intrinsics to account for removed padding
+            if metadata_list[i]["mode"] == "pad":
+                pad_left = metadata_list[i]["padding"]["left"]
+                pad_top = metadata_list[i]["padding"]["top"]
+
+                # Adjust principal point to account for removed padding
+                pred_class.intrinsic[i, 0, 2] -= pad_left
+                pred_class.intrinsic[i, 1, 2] -= pad_top
+
+        # Replace the padded data with unpadded versions
+        depth_maps = np.array(unpadded_depth_maps)
+        world_points = np.array(unpadded_world_points)
+        processed_imgs = np.array(unpadded_processed_imgs)
+        depth_confs = np.array(unpadded_depth_confs)
+    else:
+        depth_confs = pred_class.depth_conf
+
+    # Now create the point cloud from all unpadded data
     # Flatten both points and colors
     flattened_points: Float32[ndarray, "num_points 3"] = rearrange(
         world_points,
@@ -268,7 +333,6 @@ def generate_multiview_pred(
         "num_cams resized_h resized_w C -> (num_cams resized_h resized_w) C",
     )
 
-    depth_confs: Float32[ndarray, "num_cams resized_h resized_w"] = pred_class.depth_conf
     conf: Float32[ndarray, "num_points"] = depth_confs.reshape(-1)  # noqa UP037
 
     # Convert percentage threshold to actual confidence value
@@ -319,18 +383,15 @@ def generate_multiview_pred(
         depth_map[~conf_mask] = 0.0
         # resize image, confidence mask and depth map to original image size
         # Use INTER_LINEAR for the processed RGB image (standard for color images)
-
         processed_img = cv2.resize(
             processed_img, (original_img.shape[1], original_img.shape[0]), interpolation=cv2.INTER_LINEAR
         )
-
         # Use INTER_NEAREST for the confidence mask to preserve binary values
         conf_mask = cv2.resize(
             conf_mask.astype(np.float32),
             (original_img.shape[1], original_img.shape[0]),
             interpolation=cv2.INTER_NEAREST,
         )
-
         # Use INTER_NEAREST for depth map to preserve discontinuities and avoid floating artifacts
         depth_map = cv2.resize(
             depth_map, (original_img.shape[1], original_img.shape[0]), interpolation=cv2.INTER_NEAREST
@@ -366,9 +427,11 @@ class VGGTPredictor:
         self,
         device: Literal["cpu", "cuda"],
         confidence_threshold: int | float = 50.0,
+        preprocessing_mode: Literal["crop", "pad"] = "crop",
     ) -> None:
         self.device = device
         self.confidence_threshold = confidence_threshold
+        self.preprocessing_mode = preprocessing_mode
         load_start: float = timer()
         print("Loading model...")
         self.model = VGGT.from_pretrained("facebook/VGGT-1B").to(self.device)
@@ -376,7 +439,9 @@ class VGGTPredictor:
         self.dtype: torch.dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
 
     def __call__(self, rgb_list: list[UInt8[ndarray, "H W 3"]]) -> list[MultiviewPred]:
-        img_tensors: Float32[Tensor, "num_img 3 H W"] = preprocess_images(rgb_list).to(self.device)
+        img_tensors, metadata_list = preprocess_images(rgb_list, mode=self.preprocessing_mode)
+        img_tensors = img_tensors.to(self.device)
+
         # Run inference
         print("Running inference...")
         with torch.no_grad(), torch.amp.autocast("cuda", dtype=self.dtype):
@@ -401,5 +466,6 @@ class VGGTPredictor:
             img_tensors=img_tensors,
             rgb_list=rgb_list,
             confidence_threshold=self.confidence_threshold,
+            metadata_list=metadata_list if self.preprocessing_mode == "pad" else None,
         )
         return calibration_data

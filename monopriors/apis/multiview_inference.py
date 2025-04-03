@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from timeit import default_timer as timer
+from typing import Literal
 
 import cv2
 import numpy as np
@@ -63,6 +64,8 @@ class VGGTInferenceConfig:
     image_dir: Path
     confidence_threshold: int | float = 50.0
     """Confidence threshold value between 0 and 100.0"""
+    preprocessing_mode: Literal["crop", "pad"] = "crop"
+    """Mode for image preprocessing: 'crop' preserves aspect ratio, 'pad' adds white padding"""
 
 
 def run_inference(config: VGGTInferenceConfig) -> None:
@@ -73,7 +76,7 @@ def run_inference(config: VGGTInferenceConfig) -> None:
 
     for ext in SUPPORTED_IMAGE_EXTENSIONS:
         image_paths.extend(config.image_dir.glob(f"*{ext}"))
-    image_paths: list[Path] = sorted(image_paths)[0:4]
+    image_paths: list[Path] = sorted(image_paths)
     assert len(image_paths) > 0, (
         f"No images found in {config.image_dir} in supported formats {SUPPORTED_IMAGE_EXTENSIONS}"
     )
@@ -96,6 +99,7 @@ def run_inference(config: VGGTInferenceConfig) -> None:
     vggt_predictor = VGGTPredictor(
         device=device,
         confidence_threshold=config.confidence_threshold,
+        preprocessing_mode=config.preprocessing_mode,
     )
     calibration_data: list[MultiviewPred] = vggt_predictor(rgb_list=rgb_list)
 
