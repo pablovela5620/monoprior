@@ -542,6 +542,7 @@ environments:
       - pypi: https://download.pytorch.org/whl/cu124/torchvision-0.20.1%2Bcu124-cp311-cp311-linux_x86_64.whl#sha256=a5f7eb5ef22f34a7d18fcbc27b6c01f7dde5cd530df311cdbdd31169f91cbd98
       - pypi: https://files.pythonhosted.org/packages/aa/22/733a6fc4a6445d835242f64c490fdd30f4a08d58f2b788613de3f9170692/transformers-4.50.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/86/17/d9a5cf4fcf46291856d1e90762e36cbabd2a56c7265da0d1d9508c8e3943/triton-3.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - pypi: git+https://github.com/facebookresearch/vggt.git?rev=b02cc03ceee70821ed1231a530c1992507ef9862#b02cc03ceee70821ed1231a530c1992507ef9862
       - pypi: https://download.pytorch.org/whl/cu124/xformers-0.0.28.post3-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=77a5b194f296d2ed5eb493a558b4dfcefe63280ddd80b1b536b82af23da3ffbb
       - pypi: https://files.pythonhosted.org/packages/37/81/6acd6601f61e31cfb8729d3da6d5df966f80f374b78eff83760714487338/yapf-0.43.0-py3-none-any.whl
       - pypi: .
@@ -1053,6 +1054,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d0/30/dc54f88dd4a2b5dc8a0279bdd7270e735851848b762aeb1c1184ed1f6b14/tqdm-4.67.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/aa/22/733a6fc4a6445d835242f64c490fdd30f4a08d58f2b788613de3f9170692/transformers-4.50.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/86/17/d9a5cf4fcf46291856d1e90762e36cbabd2a56c7265da0d1d9508c8e3943/triton-3.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - pypi: git+https://github.com/facebookresearch/vggt.git?rev=b02cc03ceee70821ed1231a530c1992507ef9862#b02cc03ceee70821ed1231a530c1992507ef9862
       - pypi: https://download.pytorch.org/whl/cu124/xformers-0.0.28.post3-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=77a5b194f296d2ed5eb493a558b4dfcefe63280ddd80b1b536b82af23da3ffbb
       - pypi: https://files.pythonhosted.org/packages/37/81/6acd6601f61e31cfb8729d3da6d5df966f80f374b78eff83760714487338/yapf-0.43.0-py3-none-any.whl
       - pypi: .
@@ -1586,6 +1588,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/7f/fc/5b29fea8cee020515ca82cc68e3b8e1e34bb19a3535ad854cac9257b414c/typer-0.15.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/08/aa4fdfb71f7de5176385bd9e90852eaf6b5d622735020ad600f2bab54385/typing_inspection-0.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/14/33a3a1352cfa71812a3a21e8c9bfb83f60b0011f5e36f2b1399d51928209/uvicorn-0.34.0-py3-none-any.whl
+      - pypi: git+https://github.com/facebookresearch/vggt.git?rev=b02cc03ceee70821ed1231a530c1992507ef9862#b02cc03ceee70821ed1231a530c1992507ef9862
       - pypi: https://files.pythonhosted.org/packages/93/1f/5d6dbf551766308f6f50f8baf8e9860be6182911e8106da7a7f73785f4c4/websockets-15.0.1-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://download.pytorch.org/whl/cu124/xformers-0.0.28.post3-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=77a5b194f296d2ed5eb493a558b4dfcefe63280ddd80b1b536b82af23da3ffbb
       - pypi: https://files.pythonhosted.org/packages/37/81/6acd6601f61e31cfb8729d3da6d5df966f80f374b78eff83760714487338/yapf-0.43.0-py3-none-any.whl
@@ -6372,7 +6375,7 @@ packages:
 - pypi: .
   name: monopriors
   version: 0.3.1
-  sha256: 8eb8f226f6b6e19d939a5ecba1f0bdf37ee418bb22a81aedd19e1c99fbb6083c
+  sha256: 73dcb63bec61b7594f2f7ffa71f0424f5693314cc0a237731759749429f01fb6
   requires_dist:
   - geffnet>=1.0.2
   - omnidata-tools>=0.0.23
@@ -9545,6 +9548,28 @@ packages:
   - pkg:pypi/uvloop?source=hash-mapping
   size: 677289
   timestamp: 1730214493601
+- pypi: git+https://github.com/facebookresearch/vggt.git?rev=b02cc03ceee70821ed1231a530c1992507ef9862#b02cc03ceee70821ed1231a530c1992507ef9862
+  name: vggt
+  version: 0.0.1
+  requires_dist:
+  - numpy<2
+  - pillow
+  - huggingface-hub
+  - einops
+  - safetensors
+  - opencv-python
+  - gradio==5.17.1 ; extra == 'demo'
+  - viser==0.2.23 ; extra == 'demo'
+  - tqdm ; extra == 'demo'
+  - hydra-core ; extra == 'demo'
+  - omegaconf ; extra == 'demo'
+  - opencv-python ; extra == 'demo'
+  - scipy ; extra == 'demo'
+  - onnxruntime ; extra == 'demo'
+  - requests ; extra == 'demo'
+  - trimesh ; extra == 'demo'
+  - matplotlib ; extra == 'demo'
+  requires_python: '>=3.8'
 - conda: https://prefix.dev/conda-forge/linux-64/vtk-base-9.3.1-qt_py311ha56ed1f_212.conda
   sha256: 1d12575f2bc421a6818f6f9c70bcb37f14a31fa34b79aa86d87ba75e65e72d60
   md5: c49c26e31203e0eb072cc7f0e4ee4fde

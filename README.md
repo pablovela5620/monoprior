@@ -29,6 +29,15 @@ To see all available tasks
 pixi task list
 ```
 
+## Features
+
+### Multi-view Depth Estimation
+Use VGGT model for multi-view consistent depth estimation and camera pose recovery:
+
+```bash
+pixi run multiview_inference --image-dir /path/to/images
+```
+
 ## Acknowledgements
 Thanks to the following great works!
 
@@ -59,5 +68,15 @@ Thanks to the following great works!
   author={Hu, Mu and Yin, Wei and Zhang, Chi and Cai, Zhipeng and Long, Xiaoxiao and Chen, Hao and Wang, Kaixuan and Yu, Gang and Shen, Chunhua and Shen, Shaojie},
   journal={arXiv preprint arXiv:2404.15506},
   year={2024}
+}
+```
+
+[VGGT](https://github.com/facebookresearch/vggt)
+```bibtex
+@inproceedings{wang2025vggt,
+  title={VGGT: Visual Geometry Grounded Transformer},
+  author={Wang, Jianyuan and Chen, Minghao and Karaev, Nikita and Vedaldi, Andrea and Rupprecht, Christian and Novotny, David},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  year={2025}
 }
 ```
