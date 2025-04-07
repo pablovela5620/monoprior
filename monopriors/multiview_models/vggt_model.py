@@ -339,8 +339,8 @@ def generate_multiview_pred(
     conf_threshold = 0.0 if confidence_threshold == 0.0 else np.percentile(conf, confidence_threshold)
     conf_mask = (conf >= conf_threshold) & (conf > 1e-5)
 
-    vertices_3d: Float32[ndarray, "num_points 3"] = flattened_points[conf_mask]
-    colors_rgb: Float32[ndarray, "num_points 3"] = flattened_colors[conf_mask]
+    vertices_3d: Float32[ndarray, "num_points 3"] = flattened_points
+    colors_rgb: Float32[ndarray, "num_points 3"] = flattened_colors
 
     # Create an empty point cloud
     pcd = o3d.geometry.PointCloud()
@@ -379,8 +379,9 @@ def generate_multiview_pred(
         conf_threshold = 0.0 if confidence_threshold == 0.0 else np.percentile(depth_conf, confidence_threshold)
         conf_mask = (depth_conf >= conf_threshold) & (depth_conf > 1e-5)
         # filter depth map based on confidence
+        # depth_map[~conf_mask] = 0.0
+
         depth_map = depth_map.squeeze()
-        depth_map[~conf_mask] = 0.0
         # resize image, confidence mask and depth map to original image size
         # Use INTER_LINEAR for the processed RGB image (standard for color images)
         processed_img = cv2.resize(

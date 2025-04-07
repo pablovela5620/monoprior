@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from timeit import default_timer as timer
@@ -58,6 +59,78 @@ def create_blueprint(parent_log_path: Path, image_paths: list[Path]) -> rrb.Blue
     return blueprint
 
 
+def write_colmap_cameras_txt(file_path: str, intrinsics: np.ndarray, image_width: int, image_height: int) -> None:
+    """Write camera intrinsics to COLMAP cameras.txt format."""
+    with open(file_path, "w") as f:
+        f.write("# Camera list with one line of data per camera:\n")
+        f.write("#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n")
+        f.write(f"# Number of cameras: {len(intrinsics)}\n")
+
+        for i, intrinsic in enumerate(intrinsics):
+            camera_id = i + 1  # COLMAP uses 1-indexed camera IDs
+            model = "PINHOLE"
+
+            fx = intrinsic[0, 0]
+            fy = intrinsic[1, 1]
+            cx = intrinsic[0, 2]
+            cy = intrinsic[1, 2]
+
+            f.write(f"{camera_id} {model} {image_width} {image_height} {fx} {fy} {cx} {cy}\n")
+
+
+def write_colmap_images_txt(
+    file_path: str,
+    quaternions: np.ndarray,
+    translations: np.ndarray,
+    image_points2D: list[list],  # empty list for now
+    image_names: list[str],
+):
+    """Write camera poses and keypoints to COLMAP images.txt format."""
+    with open(file_path, "w") as f:
+        f.write("# Image list with two lines of data per image:\n")
+        f.write("#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n")
+        f.write("#   POINTS2D[] as (X, Y, POINT3D_ID)\n")
+
+        num_points = sum(len(points) for points in image_points2D)
+        avg_points = num_points / len(image_points2D) if image_points2D else 0
+        f.write(f"# Number of images: {len(quaternions)}, mean observations per image: {avg_points:.1f}\n")
+
+        for i in range(len(quaternions)):
+            image_id = i + 1
+            camera_id = i + 1
+
+            qw, qx, qy, qz = quaternions[i]
+            tx, ty, tz = translations[i]
+
+            f.write(f"{image_id} {qw} {qx} {qy} {qz} {tx} {ty} {tz} {camera_id} {os.path.basename(image_names[i])}\n")
+
+            # points_line = " ".join([f"{x} {y} {point3d_id + 1}" for x, y, point3d_id in image_points2D[i]])
+            points_line = " ".join([""])  # Placeholder for now
+            f.write(f"{points_line}\n")
+
+
+def write_colmap_points3D_txt(file_path: str, points3D: list) -> None:
+    """Write 3D points and tracks to COLMAP points3D.txt format."""
+    with open(file_path, "w") as f:
+        f.write("# 3D point list with one line of data per point:\n")
+        f.write("#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)\n")
+
+        # set the average track length to 0 for now
+        avg_track_length: Literal[0] = 0
+        f.write(f"# Number of points: {len(points3D)}, mean track length: {avg_track_length:.4f}\n")
+
+        for point in points3D:
+            point_id = point["id"] + 1
+            x, y, z = point["xyz"]
+            r, g, b = point["rgb"]
+            error = point["error"]
+
+            # track = " ".join([f"{img_id + 1} {point2d_idx}" for img_id, point2d_idx in point["track"]])
+            track = " ".join([""])
+
+            f.write(f"{point_id} {x} {y} {z} {int(r)} {int(g)} {int(b)} {error} {track}\n")
+
+
 @dataclass
 class VGGTInferenceConfig:
     rr_config: RerunTyroConfig
@@ -66,6 +139,8 @@ class VGGTInferenceConfig:
     """Confidence threshold value between 0 and 100.0"""
     preprocessing_mode: Literal["crop", "pad"] = "crop"
     """Mode for image preprocessing: 'crop' preserves aspect ratio, 'pad' adds white padding"""
+    output_dir: Path | None = None
+    """Output directory for colmap version. If None, results are not saved."""
 
 
 def run_inference(config: VGGTInferenceConfig) -> None:
@@ -101,33 +176,31 @@ def run_inference(config: VGGTInferenceConfig) -> None:
         confidence_threshold=config.confidence_threshold,
         preprocessing_mode=config.preprocessing_mode,
     )
-    calibration_data: list[MultiviewPred] = vggt_predictor(rgb_list=rgb_list)
+    mv_pred_list: list[MultiviewPred] = vggt_predictor(rgb_list=rgb_list)
 
     rr.log(
         f"{parent_log_path}/point_cloud",
         rr.Points3D(
-            calibration_data[0].pointcloud.points,
-            colors=calibration_data[0].pointcloud.colors,
+            mv_pred_list[0].pointcloud.points,
+            colors=mv_pred_list[0].pointcloud.colors,
         ),
         static=True,
     )
-    calib_data: MultiviewPred
-    for calib_data in calibration_data:
-        cam_log_path: Path = parent_log_path / calib_data.cam_name
+    mv_pred: MultiviewPred
+    for mv_pred in mv_pred_list:
+        cam_log_path: Path = parent_log_path / mv_pred.cam_name
 
-        mask: Float32[ndarray, "H W"] = calib_data.confidence_mask.astype(np.float32)
-        depth_map: UInt16[ndarray, "H W"] = calib_data.depth_map
+        mask: Float32[ndarray, "H W"] = mv_pred.confidence_mask.astype(np.float32)
+        depth_map: UInt16[ndarray, "H W"] = mv_pred.depth_map
 
         log_pinhole(
-            calib_data.pinhole_param,
+            mv_pred.pinhole_param,
             cam_log_path=cam_log_path,
             image_plane_distance=100.0,
             static=True,
         )
 
-        rr.log(
-            f"{cam_log_path}/pinhole/image", rr.Image(calib_data.rgb_image, color_model=rr.ColorModel.RGB), static=True
-        )
+        rr.log(f"{cam_log_path}/pinhole/image", rr.Image(mv_pred.rgb_image, color_model=rr.ColorModel.RGB), static=True)
         rr.log(
             f"{cam_log_path}/pinhole/confidence",
             rr.Image(mask),
