@@ -11,6 +11,8 @@ import rerun.blueprint as rrb
 import torch
 from jaxtyping import Float32, UInt8, UInt16
 from numpy import ndarray
+from scipy.spatial.transform import Rotation
+from simplecv.camera_parameters import Extrinsics
 from simplecv.rerun_log_utils import RerunTyroConfig, log_pinhole
 
 from monopriors.multiview_models.vggt_model import MultiviewPred, VGGTPredictor
@@ -59,7 +61,9 @@ def create_blueprint(parent_log_path: Path, image_paths: list[Path]) -> rrb.Blue
     return blueprint
 
 
-def write_colmap_cameras_txt(file_path: str, intrinsics: np.ndarray, image_width: int, image_height: int) -> None:
+def write_colmap_cameras_txt(
+    file_path: str, intrinsics: Float32[ndarray, "n 3 3"], image_width: int, image_height: int
+) -> None:
     """Write camera intrinsics to COLMAP cameras.txt format."""
     with open(file_path, "w") as f:
         f.write("# Camera list with one line of data per camera:\n")
@@ -91,8 +95,9 @@ def write_colmap_images_txt(
         f.write("#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n")
         f.write("#   POINTS2D[] as (X, Y, POINT3D_ID)\n")
 
-        num_points = sum(len(points) for points in image_points2D)
-        avg_points = num_points / len(image_points2D) if image_points2D else 0
+        # num_points = sum(len(points) for points in image_points2D)
+        # avg_points = num_points / len(image_points2D) if image_points2D else 0
+        avg_points = 0  # Placeholder for now
         f.write(f"# Number of images: {len(quaternions)}, mean observations per image: {avg_points:.1f}\n")
 
         for i in range(len(quaternions)):
@@ -129,6 +134,29 @@ def write_colmap_points3D_txt(file_path: str, points3D: list) -> None:
             track = " ".join([""])
 
             f.write(f"{point_id} {x} {y} {z} {int(r)} {int(g)} {int(b)} {error} {track}\n")
+
+
+def extrinsic_to_colmap_format(mv_pred_list: list[MultiviewPred]) -> tuple[np.ndarray, np.ndarray]:
+    """Convert extrinsic matrices to COLMAP format (quaternion + translation)."""
+    quaternions = []
+    translations = []
+
+    for mv_pred in mv_pred_list:
+        extrinsic: Extrinsics = mv_pred.pinhole_param.extrinsics
+        # VGGT's extrinsic is camera-to-world (R|t) format
+        R = extrinsic.cam_R_world
+        t = extrinsic.cam_t_world
+
+        # Convert rotation matrix to quaternion
+        # COLMAP quaternion format is [qw, qx, qy, qz]
+        rot = Rotation.from_matrix(R)
+        quat = rot.as_quat()  # scipy returns [x, y, z, w]
+        quat = np.array([quat[3], quat[0], quat[1], quat[2]])  # Convert to [w, x, y, z]
+
+        quaternions.append(quat)
+        translations.append(t)
+
+    return np.array(quaternions), np.array(translations)
 
 
 @dataclass
@@ -178,20 +206,31 @@ def run_inference(config: VGGTInferenceConfig) -> None:
     )
     mv_pred_list: list[MultiviewPred] = vggt_predictor(rgb_list=rgb_list)
 
+    pointcloud = mv_pred_list[0].pointcloud
+    pc_conf_mask = mv_pred_list[0].pointcloud_conf
+
+    filtered_points = np.asarray(pointcloud.points)[pc_conf_mask]
+    filtered_colors = np.asarray(pointcloud.colors)[pc_conf_mask]
+
     rr.log(
         f"{parent_log_path}/point_cloud",
         rr.Points3D(
-            mv_pred_list[0].pointcloud.points,
-            colors=mv_pred_list[0].pointcloud.colors,
+            filtered_points,
+            colors=filtered_colors,
         ),
         static=True,
     )
+
+    intri_stack_list: list[Float32[ndarray, "3 3"]] = []
     mv_pred: MultiviewPred
     for mv_pred in mv_pred_list:
         cam_log_path: Path = parent_log_path / mv_pred.cam_name
 
         mask: Float32[ndarray, "H W"] = mv_pred.confidence_mask.astype(np.float32)
         depth_map: UInt16[ndarray, "H W"] = mv_pred.depth_map
+
+        # Filter the depth map based on confidence mask
+        filtered_depth_map = np.where(mask > 0, depth_map, 0)
 
         log_pinhole(
             mv_pred.pinhole_param,
@@ -200,15 +239,57 @@ def run_inference(config: VGGTInferenceConfig) -> None:
             static=True,
         )
 
+        intri_stack_list.append(mv_pred.pinhole_param.intrinsics.k_matrix)
+
         rr.log(f"{cam_log_path}/pinhole/image", rr.Image(mv_pred.rgb_image, color_model=rr.ColorModel.RGB), static=True)
         rr.log(
             f"{cam_log_path}/pinhole/confidence",
-            rr.Image(mask),
+            rr.Image(mask, draw_order=-10),
             static=True,
         )
         rr.log(
             f"{cam_log_path}/pinhole/depth",
-            rr.DepthImage(depth_map, draw_order=1),
+            rr.DepthImage(filtered_depth_map, draw_order=1),
             static=True,
+        )
+
+    intri_stack = np.stack(intri_stack_list, axis=0, dtype=np.float32)
+
+    if config.output_dir is not None:
+        config.output_dir.mkdir(parents=True, exist_ok=True)
+        write_colmap_cameras_txt(
+            file_path=str(config.output_dir / "cameras.txt"),
+            intrinsics=intri_stack,
+            image_width=mv_pred_list[0].pinhole_param.intrinsics.width,
+            image_height=mv_pred_list[0].pinhole_param.intrinsics.height,
+        )
+        quaternions, translations = extrinsic_to_colmap_format(mv_pred_list)
+        image_points2D_empty = [[] for _ in range(len(mv_pred_list))]  # Initialize with empty lists
+        write_colmap_images_txt(
+            file_path=str(config.output_dir / "images.txt"),
+            quaternions=quaternions,
+            translations=translations,
+            image_points2D=image_points2D_empty,
+            image_names=[image_path.name for image_path in image_paths],
+        )
+
+        write_colmap_points3D_txt(
+            file_path=str(config.output_dir / "points3D.txt"),
+            points3D=[
+                {
+                    "id": i,
+                    "xyz": xyz,
+                    "rgb": rgb * 255,
+                    "error": 1.0,
+                    "track": [],
+                }
+                for i, (xyz, rgb) in enumerate(
+                    zip(
+                        filtered_points,
+                        filtered_colors,
+                        strict=True,
+                    )
+                )
+            ],
         )
     print(f"Inference completed in {timer() - start:.2f} seconds")
