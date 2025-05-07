@@ -1,15 +1,17 @@
-import rerun as rr
-from pathlib import Path
-from simplecv.camera_parameters import PinholeParameters
-from monopriors.monoprior_models import DsineAndUnidepth, MonoPriorPrediction
-import numpy as np
 import zipfile
-from tqdm import tqdm
-from jaxtyping import UInt8, UInt16, Float32
 from dataclasses import dataclass
-from simplecv.rerun_log_utils import RerunTyroConfig
-from simplecv.ops.tsdf_depth_fuser import Open3DFuser
+from pathlib import Path
+
+import numpy as np
+import rerun as rr
+from jaxtyping import Float32, UInt8, UInt16
+from simplecv.camera_parameters import PinholeParameters
 from simplecv.data.polycam import PolycamData, PolycamDataset, load_polycam_data
+from simplecv.ops.tsdf_depth_fuser import Open3DFuser
+from simplecv.rerun_log_utils import RerunTyroConfig
+from tqdm import tqdm
+
+from monopriors.monoprior_models import DsineAndUnidepth, MonoPriorPrediction
 
 
 @dataclass

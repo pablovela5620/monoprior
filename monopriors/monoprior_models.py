@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Literal
-import torch
-import numpy as np
 from dataclasses import dataclass
-from jaxtyping import Float, UInt8
-from monopriors.surface_normal_models import (
-    get_normal_predictor,
-    SurfaceNormalPrediction,
-)
-from monopriors.metric_depth_models import get_metric_predictor, MetricDepthPrediction
+from typing import Literal
+
+import numpy as np
+import torch
 from einops import rearrange
+from jaxtyping import Float, UInt8
+
+from monopriors.metric_depth_models import MetricDepthPrediction, get_metric_predictor
+from monopriors.surface_normal_models import (
+    SurfaceNormalPrediction,
+    get_normal_predictor,
+)
 
 
 @dataclass
@@ -29,12 +31,8 @@ class OldMonoPriorPrediction:
         Float[np.ndarray, "b h w 1"] | None,
         Float[np.ndarray, "b h w 1"] | None,
     ]:
-        depth_np_bhw1 = rearrange(self.depth_b1hw, "b c h w -> b h w c").numpy(
-            force=True
-        )
-        normal_np_bhw3 = rearrange(self.normal_b3hw, "b c h w -> b h w c").numpy(
-            force=True
-        )
+        depth_np_bhw1 = rearrange(self.depth_b1hw, "b c h w -> b h w c").numpy(force=True)
+        normal_np_bhw3 = rearrange(self.normal_b3hw, "b c h w -> b h w c").numpy(force=True)
         K_np_b33 = self.K_b33.numpy(force=True) if self.K_b33 is not None else None
         depth_conf_np_bhw1 = (
             rearrange(self.depth_conf_b1hw, "b c h w -> b h w c").numpy(force=True)
@@ -63,26 +61,18 @@ class MonoPriorPrediction:
 
 class MonoPriorModel(ABC):
     def __init__(self) -> None:
-        self.device: Literal["cuda", "cpu"] = (
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
+        self.device: Literal["cuda", "cpu"] = "cuda" if torch.cuda.is_available() else "cpu"
 
     @abstractmethod
-    def __call__(
-        self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None
-    ) -> MonoPriorPrediction:
+    def __call__(self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None) -> MonoPriorPrediction:
         raise NotImplementedError
 
 
 class DsineAndUnidepth(MonoPriorModel):
     def __init__(self) -> None:
         super().__init__()
-        self.depth_model = get_metric_predictor("UniDepthMetricPredictor")(
-            device=self.device
-        )
-        self.surface_model = get_normal_predictor("DSineNormalPredictor")(
-            device=self.device
-        )
+        self.depth_model = get_metric_predictor("Metric3DPredictor")(device=self.device)
+        self.surface_model = get_normal_predictor("DSineNormalPredictor")(device=self.device)
 
     def __call__(
         self,

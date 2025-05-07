@@ -7,7 +7,7 @@ from .omni_normal_model import OmniNormalPredictor
 from .stable_normal_model import StableNormalPredictor
 
 # Define predictor names as a list of strings
-NORMAL_PREDICTORS = Literal["DSineNormalPredictor", "OmniNormalPredictor", "StableNormalPredictor"]
+NORMAL_PREDICTORS = Literal["DSineNormalPredictor", "StableNormalPredictor"]
 
 # Use the list to generate the __all__ list
 __all__: list[str] = list(get_args(NORMAL_PREDICTORS)) + [
