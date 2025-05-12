@@ -118,6 +118,7 @@ torch = { version = ">=2.7.0", index = "https://download.pytorch.org/whl/cu128" 
 torchvision = { version = ">=0.20.1", index = "https://download.pytorch.org/whl/cu128" }
 xformers = { version = "==0.0.30", index = "https://download.pytorch.org/whl/cu128" }
 vggt = { git = "https://github.com/pablovela5620/vggt.git", rev = "5ed6ec88a951f27959f73bc72eb4b6dc7a028b0c" }
+moge = { git = "https://github.com/microsoft/MoGe.git" }
 
 # [tool.pixi.feature.app.dependencies]
 # gradio = "*"

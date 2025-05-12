@@ -1,12 +1,14 @@
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
-from jaxtyping import UInt8, Float64, Float32, Bool
-from monopriors.relative_depth_models import RelativeDepthPrediction, RELATIVE_PREDICTORS
-from monopriors.metric_depth_models import MetricDepthPrediction, METRIC_PREDICTORS
 from einops import rearrange
-from monopriors.depth_utils import depth_to_points, clip_disparity, depth_edges_mask, depth_to_disparity
+from jaxtyping import Bool, Float32, Float64, UInt8
+
+from monopriors.depth_utils import clip_disparity, depth_edges_mask, depth_to_disparity, depth_to_points
+from monopriors.metric_depth_models import METRIC_PREDICTORS, MetricDepthPrediction
+from monopriors.relative_depth_models import RELATIVE_PREDICTORS, RelativeDepthPrediction
 
 
 def log_relative_pred(
@@ -15,7 +17,7 @@ def log_relative_pred(
     rgb_hw3: UInt8[np.ndarray, "h w 3"],
     remove_flying_pixels: bool = True,
     jpeg_quality: int = 90,
-    depth_edge_threshold: float = 1.1,
+    depth_edge_threshold: int | float = 1.1,
 ) -> None:
     cam_log_path: Path = parent_log_path / "camera"
     pinhole_path: Path = cam_log_path / "pinhole"
@@ -40,31 +42,23 @@ def log_relative_pred(
             camera_xyz=rr.ViewCoordinates.RDF,
         ),
     )
-    rr.log(
-        f"{pinhole_path}/image", rr.Image(rgb_hw3).compress(jpeg_quality=jpeg_quality)
-    )
+    rr.log(f"{pinhole_path}/image", rr.Image(rgb_hw3).compress(jpeg_quality=jpeg_quality))
 
     depth_hw: Float32[np.ndarray, "h w"] = relative_pred.depth
     if remove_flying_pixels:
-        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(
-            depth_hw, threshold=depth_edge_threshold
-        )
+        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(depth_hw, threshold=depth_edge_threshold)
         depth_hw: Float32[np.ndarray, "h w"] = depth_hw * ~edges_mask
 
     rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_hw))
 
     # removes outliers from disparity (sometimes we can get weirdly large values)
-    clipped_disparity: UInt8[np.ndarray, "h w"] = clip_disparity(
-        relative_pred.disparity
-    )
+    clipped_disparity: UInt8[np.ndarray, "h w"] = clip_disparity(relative_pred.disparity)
 
     # log to cam_log_path to avoid backprojecting disparity
     rr.log(f"{cam_log_path}/disparity", rr.DepthImage(clipped_disparity))
 
     depth_1hw: Float32[np.ndarray, "1 h w"] = rearrange(depth_hw, "h w -> 1 h w")
-    pts_3d: Float32[np.ndarray, "h w 3"] = depth_to_points(
-        depth_1hw, relative_pred.K_33
-    )
+    pts_3d: Float32[np.ndarray, "h w 3"] = depth_to_points(depth_1hw, relative_pred.K_33)
 
     rr.log(
         f"{parent_log_path}/point_cloud",
@@ -115,7 +109,8 @@ def create_compare_depth_blueprint(
     return blueprint
 
 
-def log_metric_pred(parent_log_path: Path,
+def log_metric_pred(
+    parent_log_path: Path,
     metric_pred: MetricDepthPrediction,
     rgb_hw3: UInt8[np.ndarray, "h w 3"],
     remove_flying_pixels: bool = True,
@@ -145,33 +140,25 @@ def log_metric_pred(parent_log_path: Path,
             camera_xyz=rr.ViewCoordinates.RDF,
         ),
     )
-    rr.log(
-        f"{pinhole_path}/image", rr.Image(rgb_hw3).compress(jpeg_quality=jpeg_quality)
-    )
+    rr.log(f"{pinhole_path}/image", rr.Image(rgb_hw3).compress(jpeg_quality=jpeg_quality))
 
     depth_hw: Float32[np.ndarray, "h w"] = metric_pred.depth_meters
     if remove_flying_pixels:
-        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(
-            depth_hw, threshold=depth_edge_threshold
-        )
+        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(depth_hw, threshold=depth_edge_threshold)
         depth_hw: Float32[np.ndarray, "h w"] = depth_hw * ~edges_mask
 
-    rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_hw,meter=1.0))
+    rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_hw, meter=1.0))
 
     # removes outliers from disparity (sometimes we can get weirdly large values)
     clipped_disparity: Float32[np.ndarray, "h w"] = depth_to_disparity(
-        depth_hw,
-        focal_length=int(metric_pred.K_33[0, 0]),
-        baseline=1000.0
-        )
+        depth_hw, focal_length=int(metric_pred.K_33[0, 0]), baseline=1000.0
+    )
 
     # log to cam_log_path to avoid backprojecting disparity
     rr.log(f"{cam_log_path}/disparity", rr.DepthImage(clipped_disparity))
 
     depth_1hw: Float32[np.ndarray, "1 h w"] = rearrange(depth_hw, "h w -> 1 h w")
-    pts_3d: Float32[np.ndarray, "h w 3"] = depth_to_points(
-        depth_1hw, metric_pred.K_33
-    )
+    pts_3d: Float32[np.ndarray, "h w 3"] = depth_to_points(depth_1hw, metric_pred.K_33)
 
     rr.log(
         f"{parent_log_path}/point_cloud",
