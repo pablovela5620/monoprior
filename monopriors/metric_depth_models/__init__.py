@@ -1,7 +1,9 @@
-from .base_metric_depth import MetricDepthPrediction, BaseMetricPredictor
-from .unidepth import UniDepthMetricPredictor
+from collections.abc import Callable
+from typing import Literal, get_args
+
+from .base_metric_depth import BaseMetricPredictor, MetricDepthPrediction
 from .metric3d import Metric3DPredictor
-from typing import Literal, get_args, Callable
+from .unidepth import UniDepthMetricPredictor
 
 # Define predictor names as a list of strings
 METRIC_PREDICTORS = Literal["UniDepthMetricPredictor", "Metric3DPredictor"]

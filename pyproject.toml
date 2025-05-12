@@ -9,10 +9,10 @@ dependencies = [
     "geffnet>=1.0.2",
     "omnidata-tools>=0.0.23",
     "mmcv-lite>=2.2.0",
-    "timm>=1.0.15,<2",
     "pytorch-lightning>=2.5.1,<3",
     "transformers",
     "diffusers[torch]>=0.32.2,<0.33",
+    "timm>=1.0.15,<2",
     # pypi only
 
 ]
@@ -25,6 +25,7 @@ channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64"]
 requires-pixi = ">=0.40"
 
+[tool.pixi.pypi-options]
 
 [tool.pixi.activation]
 scripts = [".pixi.sh"]
@@ -85,6 +86,7 @@ cmd = """
 description = "Runs Gradio frontend for depth comparison"
 depends-on = ["_install-wheel"]
 
+
 [tool.pixi.dependencies]
 python = "3.11.*"
 pip = "24.*"
@@ -92,14 +94,13 @@ icecream = ">=2.1.3,<2.2"
 jaxtyping = ">=0.2.36,<0.3"
 einops = ">=0.8.0,<0.9"
 matplotlib = ">=3.8.3,<3.9"
-wandb = ">=0.16.5,<0.17"
-scipy = ">=1.12.0,<1.13"
+wandb = ">=0.19.10,<0.20"
 pandas = ">=2.2.2,<2.3"
 pyarrow = ">=15.0.2,<15.1"
 jupyterlab = ">=4.2.0,<4.3"
-numpy = "<2.0.0"
+numpy = ">=2.0.0"
 beartype = ">=0.20"
-rerun-sdk = ">=0.22.1,<0.23"
+rerun-sdk = ">=0.23.1,<0.24"
 pyserde = ">=0.23.0,<0.24"
 tyro = ">=0.9.1,<0.10"
 open3d = ">=0.19.0,<0.20"
@@ -108,21 +109,22 @@ imageio = ">=2.37.0,<3"
 imageio-ffmpeg = ">=0.6.0,<0.7"
 py-opencv = ">=4.10.0,<5"
 hf-transfer = ">=0.1.9,<0.2"
+scipy = ">=1.15.2,<2"
 
 [tool.pixi.pypi-dependencies]
 monopriors = { path = ".", editable = true }
 simplecv = { git = "https://github.com/pablovela5620/simplecv.git" }
-torch = { version = ">=2.5.1", index = "https://download.pytorch.org/whl/cu124" }
-torchvision = { version = ">=0.20.1", index = "https://download.pytorch.org/whl/cu124" }
-# unidepth requires 0.0.28.post3 for NystromAttention, maybe remove UniDepth?
-xformers = { version = "==0.0.28.post3", index = "https://download.pytorch.org/whl/cu124" }
-vggt = { git = "https://github.com/facebookresearch/vggt.git", rev = "b02cc03ceee70821ed1231a530c1992507ef9862" }
+torch = { version = ">=2.7.0", index = "https://download.pytorch.org/whl/cu128" }
+torchvision = { version = ">=0.20.1", index = "https://download.pytorch.org/whl/cu128" }
+xformers = { version = "==0.0.30", index = "https://download.pytorch.org/whl/cu128" }
+vggt = { git = "https://github.com/pablovela5620/vggt.git", rev = "5ed6ec88a951f27959f73bc72eb4b6dc7a028b0c" }
+moge = { git = "https://github.com/microsoft/MoGe.git" }
 
-[tool.pixi.feature.app.dependencies]
-gradio = "<5"
+# [tool.pixi.feature.app.dependencies]
+# gradio = "*"
 
-[tool.pixi.feature.app.pypi-dependencies]
-gradio-rerun = { url = "https://huggingface.co/datasets/pablovela5620/gradio-rr-wheels/resolve/main/gradio_rerun-0.0.11-py3-none-any.whl" }
+# [tool.pixi.feature.app.pypi-dependencies]
+# gradio-rerun = ">=0.23.1"
 
 [tool.pixi.feature.spaces.pypi-dependencies]
 spaces = "*"

@@ -1,9 +1,12 @@
-from .base_relative_depth import RelativeDepthPrediction, BaseRelativePredictor
-from .depth_anything_v2 import DepthAnythingV2Predictor
+from collections.abc import Callable
+from typing import Literal, get_args
+
+from .base_relative_depth import BaseRelativePredictor, RelativeDepthPrediction
 from .depth_anything_v1 import DepthAnythingV1Predictor
-from .unidepth import UniDepthRelativePredictor
+from .depth_anything_v2 import DepthAnythingV2Predictor
 from .metric3d_relative import Metric3DRelativePredictor
-from typing import Literal, get_args, Callable
+from .moge import MogeV1Predictor
+from .unidepth import UniDepthRelativePredictor
 
 # Define predictor names as a list of strings
 RELATIVE_PREDICTORS = Literal[
@@ -11,6 +14,7 @@ RELATIVE_PREDICTORS = Literal[
     "DepthAnythingV2Predictor",
     "UniDepthRelativePredictor",
     "Metric3DRelativePredictor",
+    "MogeV1Predictor",
 ]
 
 # Use the list to generate the __all__ list
@@ -31,5 +35,7 @@ def get_relative_predictor(
             return DepthAnythingV1Predictor
         case "Metric3DRelativePredictor":
             return Metric3DRelativePredictor
+        case "MogeV1Predictor":
+            return MogeV1Predictor
         case _:
             raise ValueError(f"Unknown predictor type: {predictor_type}")

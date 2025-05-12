@@ -7,7 +7,7 @@ import numpy as np
 import open3d as o3d
 import torch
 from einops import rearrange
-from jaxtyping import Float32, UInt8, UInt16
+from jaxtyping import Bool, Float32, UInt8, UInt16
 from numpy import ndarray
 from PIL import Image
 from serde import field as serde_field
@@ -264,6 +264,7 @@ class MultiviewPred:
     depth_map: UInt16[ndarray, "H W"]
     confidence_mask: UInt8[ndarray, "H W"]
     pointcloud: o3d.geometry.PointCloud
+    pointcloud_conf: Bool[ndarray, "num_points"]
     pinhole_param: PinholeParameters
 
 
@@ -337,10 +338,10 @@ def generate_multiview_pred(
 
     # Convert percentage threshold to actual confidence value
     conf_threshold = 0.0 if confidence_threshold == 0.0 else np.percentile(conf, confidence_threshold)
-    conf_mask = (conf >= conf_threshold) & (conf > 1e-5)
+    pc_conf_mask = (conf >= conf_threshold) & (conf > 1e-5)
 
-    vertices_3d: Float32[ndarray, "num_points 3"] = flattened_points[conf_mask]
-    colors_rgb: Float32[ndarray, "num_points 3"] = flattened_colors[conf_mask]
+    vertices_3d: Float32[ndarray, "num_points 3"] = flattened_points
+    colors_rgb: Float32[ndarray, "num_points 3"] = flattened_colors
 
     # Create an empty point cloud
     pcd = o3d.geometry.PointCloud()
@@ -379,8 +380,9 @@ def generate_multiview_pred(
         conf_threshold = 0.0 if confidence_threshold == 0.0 else np.percentile(depth_conf, confidence_threshold)
         conf_mask = (depth_conf >= conf_threshold) & (depth_conf > 1e-5)
         # filter depth map based on confidence
+        # depth_map[~conf_mask] = 0.0
+
         depth_map = depth_map.squeeze()
-        depth_map[~conf_mask] = 0.0
         # resize image, confidence mask and depth map to original image size
         # Use INTER_LINEAR for the processed RGB image (standard for color images)
         processed_img = cv2.resize(
@@ -415,6 +417,7 @@ def generate_multiview_pred(
                 depth_map=(depth_map * 1000).astype(np.uint16),  # convert to uint16
                 confidence_mask=(conf_mask * 255).astype(np.uint8),
                 pointcloud=pcd,
+                pointcloud_conf=pc_conf_mask,
                 pinhole_param=pinhole_param,
             )
         )
