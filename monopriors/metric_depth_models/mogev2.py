@@ -4,17 +4,15 @@ from typing import Literal
 import numpy as np
 import torch
 from jaxtyping import Float, UInt8
-
-# from moge.model.v1 import MoGeModel
-from moge.model.v2 import MoGeModel
+from moge.model.v1 import MoGeModel
 from torch import Tensor
 
 from monopriors.depth_utils import depth_to_disparity
 
-from .base_relative_depth import BaseRelativePredictor, RelativeDepthPrediction
+from .base_metric_depth import BaseMetricPredictor, MetricDepthPrediction
 
 
-class MogeV1Predictor(BaseRelativePredictor):
+class MogeV1Predictor(BaseMetricPredictor):
     def __init__(
         self,
         device: Literal["cpu", "cuda"],
@@ -23,13 +21,13 @@ class MogeV1Predictor(BaseRelativePredictor):
         super().__init__()
         print("Loading MoGe model...")
         start = timer()
-        self.model = MoGeModel.from_pretrained("Ruicheng/moge-2-vitl-normal").to(device)
+        self.model = MoGeModel.from_pretrained("Ruicheng/moge-vitl").to(device)
         print(f"MoGe model loaded. Time: {timer() - start:.2f}s")
         self.device = device
 
     def __call__(
         self, rgb: UInt8[np.ndarray, "h w 3"], K_33: Float[np.ndarray, "3 3"] | None = None
-    ) -> RelativeDepthPrediction:
+    ) -> MetricDepthPrediction:
         h, w, _ = rgb.shape
         input_image = torch.tensor(rgb / 255, dtype=torch.float32, device=self.device).permute(2, 0, 1)
 

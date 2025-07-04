@@ -1,27 +1,29 @@
-import gradio as gr
-import rerun as rr
-import tempfile
-
-import numpy as np
-from pathlib import Path
+import gc
 import os
+import tempfile
+from pathlib import Path
+from typing import get_args
+
+import gradio as gr
+import mmcv
+import numpy as np
+import rerun as rr
+import rerun.blueprint as rrb
+import torch
 from gradio_rerun import Rerun
+from jaxtyping import UInt8
 
 from monopriors.relative_depth_models import (
-    get_relative_predictor,
+    RELATIVE_PREDICTORS,
     BaseRelativePredictor,
     RelativeDepthPrediction,
-    RELATIVE_PREDICTORS,
+    get_relative_predictor,
 )
 from monopriors.rr_logging_utils import log_relative_pred
-from jaxtyping import UInt8
-from typing import get_args
-import gc
-import torch
-import mmcv
 
 try:
     import spaces  # type: ignore
+
     IN_SPACES = True
 except ImportError:
     print("Not running on Zero")
@@ -31,23 +33,19 @@ except ImportError:
 MODELS_TO_SKIP: list[str] = []
 model_load_status: str = "Models loaded and ready to use!"
 if gr.NO_RELOAD:
-    DEPTH_PREDICTOR: BaseRelativePredictor = get_relative_predictor(
-        "DepthAnythingV2Predictor"
-    )(device="cuda")
+    DEPTH_PREDICTOR: BaseRelativePredictor = get_relative_predictor("MogeV1Predictor")(device="cuda")
 
 
-def predict_depth(
-    rgb_hw3: UInt8[np.ndarray, "h w 3"]
-) -> RelativeDepthPrediction:
-    relative_pred: RelativeDepthPrediction = DEPTH_PREDICTOR.__call__(
-            rgb=rgb_hw3, K_33=None
-        )
+def predict_depth(rgb_hw3: UInt8[np.ndarray, "h w 3"]) -> RelativeDepthPrediction:
+    relative_pred: RelativeDepthPrediction = DEPTH_PREDICTOR.__call__(rgb=rgb_hw3, K_33=None)
     return relative_pred
-    
+
+
 if IN_SPACES:
     predict_depth = spaces.GPU(predict_depth)
     # remove any model that fails on zerogpu spaces
     MODELS_TO_SKIP.extend(["Metric3DRelativePredictor", "Metric3DPredictor"])
+
 
 def load_model(
     model: RELATIVE_PREDICTORS,
@@ -56,9 +54,7 @@ def load_model(
     print(model)
     # check if the models are in the list of models to skip
     if any(model == m for m in MODELS_TO_SKIP):
-        raise gr.Error(
-            f"Model not supported on ZeroGPU, please try another model: {MODELS_TO_SKIP}"
-        )
+        raise gr.Error(f"Model not supported on ZeroGPU, please try another model: {MODELS_TO_SKIP}")
 
     global DEPTH_PREDICTOR
     # delete the previous models and clear gpu memory
@@ -84,9 +80,29 @@ def relative_depth_from_img(
 ) -> str:
     try:
         parent_log_path = Path("world")
+        blueprint = rrb.Blueprint(
+            rrb.Horizontal(
+                rrb.Spatial3DView(
+                    contents=[
+                        "$origin/**",
+                        "- $origin/camera/pinhole/depth",
+                        "- /world/camera/pinhole/depth",
+                        "- /world/camera/pinhole/image",
+                    ],
+                ),
+                rrb.Vertical(
+                    rrb.Spatial2DView(origin=f"{parent_log_path}/camera/pinhole/image"),
+                    rrb.Spatial2DView(origin=f"{parent_log_path}/camera/pinhole/depth"),
+                    rrb.Spatial2DView(origin=f"{parent_log_path}/camera/disparity"),
+                ),
+                column_shares=[3, 1],
+            ),
+            collapse_panels=True,
+        )
+        rr.send_blueprint(blueprint=blueprint)
 
         # resize the image to have a max dim of 1024
-        max_dim:int = 1024
+        max_dim: int = 1024
         height, width, _ = rgb_hw3.shape
         current_dim = max(height, width)
         if current_dim > max_dim:
@@ -94,7 +110,7 @@ def relative_depth_from_img(
             rgb_hw3 = mmcv.imrescale(img=rgb_hw3, scale=scale_factor)
 
         relative_pred: RelativeDepthPrediction = predict_depth(rgb_hw3)
-        rr.log(f"{parent_log_path}", rr.ViewCoordinates.RDF, timeless=True)
+        rr.log("/", rr.ViewCoordinates.RDF, static=True)
         log_relative_pred(
             parent_log_path,
             relative_pred,
@@ -148,7 +164,7 @@ with gr.Blocks() as depth_inference_block:
                 model_dropdown = gr.Dropdown(
                     choices=list(get_args(RELATIVE_PREDICTORS)),
                     label="Model",
-                    value="DepthAnythingV2Predictor",
+                    value="MogeV1Predictor",
                     interactive=True,
                 )
             with gr.Row():
@@ -171,7 +187,6 @@ with gr.Blocks() as depth_inference_block:
                 "time": "collapsed",
                 "blueprint": "collapsed",
                 "selection": "collapsed",
-                "top": "collapsed",
             },
         )
 
@@ -202,7 +217,6 @@ with gr.Blocks() as depth_inference_block:
         ],
         outputs=[rr_viewer],
     )
-
 
     load_model_btn.click(
         load_model,
