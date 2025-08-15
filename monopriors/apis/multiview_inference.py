@@ -1,20 +1,27 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from timeit import default_timer as timer
 from typing import Literal
 
 import cv2
 import numpy as np
+import open3d as o3d
 import rerun as rr
 import rerun.blueprint as rrb
 import torch
-from jaxtyping import Float32, UInt8, UInt16
+from einops import rearrange
+from jaxtyping import Bool, Float, Float32, UInt8
 from numpy import ndarray
 from scipy.spatial.transform import Rotation
 from simplecv.camera_parameters import Extrinsics
+from simplecv.ops.conventions import CameraConventions, convert_pose
 from simplecv.rerun_log_utils import RerunTyroConfig, log_pinhole
+from torch import Tensor
+from tqdm.auto import trange
 
+from monopriors.camera_utils import auto_orient_and_center_poses
+from monopriors.depth_utils import multidepth_to_points
 from monopriors.multiview_models.vggt_model import MultiviewPred, VGGTPredictor
 
 np.set_printoptions(suppress=True)
@@ -31,6 +38,7 @@ def create_blueprint(parent_log_path: Path, image_paths: list[Path]) -> rrb.Blue
             # don't include depths in the 3D view, as they can be very noisy
             *[f"- /{parent_log_path}/camera_{i}/pinhole/depth" for i in range(len(image_paths))],
         ],
+        line_grid=rrb.archetypes.LineGrid3D(visible=False),
     )
     view2d = rrb.Vertical(
         contents=[
@@ -159,16 +167,212 @@ def extrinsic_to_colmap_format(mv_pred_list: list[MultiviewPred]) -> tuple[np.nd
     return np.array(quaternions), np.array(translations)
 
 
+def orient_mv_pred_list(
+    mv_pred_list: list[MultiviewPred],
+    method: Literal["pca", "up", "vertical", "none"] = "up",
+    center_method: Literal["poses", "focus", "none"] = "poses",
+) -> list[MultiviewPred]:
+    extri_list: list[Extrinsics] = [mv_pred.pinhole_param.extrinsics for mv_pred in mv_pred_list]
+
+    world_T_cam_batch: Float[ndarray, "*num_poses 4 4"] = np.stack([extri.world_T_cam for extri in extri_list])
+    # check if in opencv or opengl coordinate system
+    assert len(set(mv_pred.pinhole_param.intrinsics.camera_conventions for mv_pred in mv_pred_list)) == 1
+    if mv_pred_list[0].pinhole_param.intrinsics.camera_conventions == "RDF":
+        # convert to OpenGL
+        world_T_cam_gl: Float[ndarray, "*num_poses 4 4"] = convert_pose(
+            world_T_cam_batch, CameraConventions.CV, CameraConventions.GL
+        )
+        world_T_cam_gl: Float[Tensor, "*num_poses 4 4"] = torch.tensor(world_T_cam_gl, dtype=torch.float32)
+    else:
+        world_T_cam_gl: Float[Tensor, "*num_poses 4 4"] = torch.tensor(world_T_cam_batch, dtype=torch.float32)
+
+    # Run orientation (returns (N,3,4))
+    oriented_world_T_cam_3x4, orient_transform = auto_orient_and_center_poses(
+        world_T_cam_gl, method=method, center_method=center_method
+    )
+
+    N = oriented_world_T_cam_3x4.shape[0]
+    # Rebuild 4x4 oriented camera-to-world
+    oriented_world_T_cam_4x4: Float32[torch.Tensor, "N 4 4"] = torch.cat(
+        [
+            oriented_world_T_cam_3x4,
+            torch.tensor([[0, 0, 0, 1]], dtype=torch.float32).expand(N, 1, 4),
+        ],
+        dim=1,
+    )
+    # convert back to opencv
+    oriented_world_T_cam_cv: Float[ndarray, "N 4 4"] = convert_pose(
+        oriented_world_T_cam_4x4.numpy(force=True), CameraConventions.GL, CameraConventions.CV
+    )
+    # put back into mv pred list using replace
+    oriented_mv_pred_list: list[MultiviewPred] = []
+    for idx, mv_pred in enumerate(mv_pred_list):
+        oriented_extri: Extrinsics = Extrinsics(
+            world_R_cam=oriented_world_T_cam_cv[idx, :3, :3],
+            world_t_cam=oriented_world_T_cam_cv[idx, :3, 3],
+        )
+        oriented_mv_pred_list.append(
+            replace(mv_pred, pinhole_param=replace(mv_pred.pinhole_param, extrinsics=oriented_extri))
+        )
+
+    return oriented_mv_pred_list
+
+
 @dataclass
 class VGGTInferenceConfig:
     rr_config: RerunTyroConfig
     image_dir: Path
-    confidence_threshold: int | float = 50.0
-    """Confidence threshold value between 0 and 100.0"""
+    """Directory containing input images."""
+    keep_top_percent: int | float = 50.0
+    """keep_top_percent: Percentage in [0,100]. Interpreted as the fraction to discard;
+        the top (100 - keep_top_percent)% of pixel scores are kept.
+        E.g. 75 -> keep top 25%; 30 -> keep top 70%."""
     preprocessing_mode: Literal["crop", "pad"] = "crop"
     """Mode for image preprocessing: 'crop' preserves aspect ratio, 'pad' adds white padding"""
     output_dir: Path | None = None
     """Output directory for colmap version. If None, results are not saved."""
+
+
+def filter_confidences(confidence: Float32[ndarray, "H W"], keep_top_percent: int | float) -> UInt8[ndarray, "H W"]:
+    """
+    Create a confidence mask by keeping the top percentage of pixels.
+
+    Args:
+        confidence: 2D confidence map where higher values indicate higher confidence
+        keep_top_percent: Percentage of pixels to keep (0-100). E.g., 25.0 keeps top 25%
+
+    Returns:
+        Binary mask as UInt8 array with values 0 (filtered out) or 255 (kept)
+
+    Notes:
+        - Uses percentile-based thresholding: pixels >= (100 - keep_top_percent) percentile
+        - Also filters out very low confidence values (< 1e-5) regardless of percentile
+    """
+    conf_threshold: float = float(np.percentile(confidence, 100.0 - keep_top_percent))
+    mask: Bool[ndarray, "H W"] = (confidence >= conf_threshold) & (confidence > 1e-5)
+    mask: UInt8[ndarray, "H W"] = (mask * 255).astype(np.uint8)
+    return mask
+
+
+def robust_filter_confidences(
+    confidence: Float32[ndarray, "H W"], keep_top_percent: int | float
+) -> UInt8[ndarray, "H W"]:
+    """
+    Robust confidence filtering that handles edge cases in percentile-based thresholding.
+
+    This function addresses the issue where standard percentile thresholding can overshoot
+    the target percentage when many pixels share the same confidence value as the percentile
+    pivot (e.g., in nearly constant confidence maps).
+
+    Args:
+        confidence: 2D confidence map where higher values indicate higher confidence
+        keep_top_percent: Target percentage of pixels to keep (0-100)
+
+    Returns:
+        Binary mask as UInt8 array with values 0 (filtered out) or 255 (kept)
+
+    Notes:
+        - Iteratively reduces the percentile threshold until the actual kept percentage
+          is within tolerance (±10 percentage points) of the target
+        - Uses filter_confidences() internally for the actual filtering
+        - Handles degenerate cases like uniform confidence distributions
+        - May keep slightly fewer pixels than requested to avoid significant overshoot
+    """
+
+    keep_top_percent: int | float = keep_top_percent
+    mask: UInt8[ndarray, "H W"] = filter_confidences(confidence, keep_top_percent)
+    # check percentage of values in masks that are 255
+    percentage_255: float = float(100.0 * np.sum(mask == 255) / mask.size)
+    tol: float = 10.0  # allowable deviation in percentage points
+    target: float = float(keep_top_percent)
+    while percentage_255 >= target + tol:
+        keep_top_percent -= 1.0
+        mask: UInt8[ndarray, "H W"] = filter_confidences(confidence, keep_top_percent)
+        percentage_255: float = float(100.0 * np.sum(mask == 255) / mask.size)
+
+    return mask
+
+
+def estimate_voxel_size(
+    points: Float32[ndarray, "N 3"],
+    target_points: int = 100_000,
+    tolerance: float = 0.25,
+    max_iterations: int = 10,
+    min_voxel_ratio: float = 0.0001,
+    max_voxel_ratio: float = 0.5,
+) -> float:
+    """
+    Use binary search to find optimal voxel size for target point count.
+
+    Args:
+        points: Input point cloud points
+        target_points: Desired number of points after downsampling
+        tolerance: Acceptable relative error (0.25 = within 25% of target)
+        max_iterations: Maximum binary search iterations
+        min_voxel_ratio: Minimum voxel size as ratio of scene diagonal
+        max_voxel_ratio: Maximum voxel size as ratio of scene diagonal
+
+    Returns:
+        Voxel size that results in point count within tolerance of target_points
+    """
+    if len(points) == 0:
+        return 0.01  # Default fallback
+
+    # Calculate scene bounds for voxel size limits
+    min_bounds: Float32[ndarray, "3"] = np.min(points, axis=0)
+    max_bounds: Float32[ndarray, "3"] = np.max(points, axis=0)
+    scene_diagonal: float = float(np.linalg.norm(max_bounds - min_bounds))
+
+    # Set search bounds
+    min_voxel_size: float = scene_diagonal * min_voxel_ratio
+    max_voxel_size: float = scene_diagonal * max_voxel_ratio
+
+    # Create Open3D point cloud once for reuse
+    pcd_temp: o3d.geometry.PointCloud = o3d.geometry.PointCloud()
+    pcd_temp.points = o3d.utility.Vector3dVector(points)
+
+    # Binary search for optimal voxel size
+    low: float = min_voxel_size
+    high: float = max_voxel_size
+    best_voxel_size: float = (low + high) / 2
+
+    t = trange(max_iterations, desc="Estimating voxel size")
+    for _ in t:
+        current_voxel_size: float = (low + high) / 2
+
+        # Test this voxel size
+        pcd_test: o3d.geometry.PointCloud = pcd_temp.voxel_down_sample(current_voxel_size)
+        current_points: int = len(pcd_test.points)
+
+        # Calculate relative error
+        error: float = abs(current_points - target_points) / target_points
+
+        # update progress bar postfix
+        t.set_postfix(
+            {
+                "voxel_size": f"{current_voxel_size:.6f}",
+                "points": current_points,
+                "error": f"{error:.3f}",
+            }
+        )
+
+        # Check if we're within tolerance
+        if error <= tolerance:
+            best_voxel_size = current_voxel_size
+            t.write(f"  - ✓ Found optimal voxel size: {best_voxel_size:.6f}")
+            break
+
+        # Update search bounds
+        if current_points > target_points:
+            # Too many points, need larger voxel size
+            low = current_voxel_size
+        else:
+            # Too few points, need smaller voxel size
+            high = current_voxel_size
+
+        best_voxel_size = current_voxel_size
+
+    return float(best_voxel_size)
 
 
 def run_inference(config: VGGTInferenceConfig) -> None:
@@ -191,26 +395,60 @@ def run_inference(config: VGGTInferenceConfig) -> None:
     parent_log_path = Path("world")
     blueprint = create_blueprint(parent_log_path=parent_log_path, image_paths=image_paths)
     rr.send_blueprint(blueprint=blueprint)
-    rr.log(f"{parent_log_path}", rr.ViewCoordinates.RDF, static=True)
-    # Apply the rotation to the root coordinate system
-    rr.log(
-        f"{parent_log_path}",
-        rr.Transform3D(rotation=rr.RotationAxisAngle(axis=(0, 1, 0), radians=-np.pi / 4)),
-        static=True,
-    )
+    rr.log(f"{parent_log_path}", rr.ViewCoordinates.RFU, static=True)
 
     vggt_predictor = VGGTPredictor(
         device=device,
-        confidence_threshold=config.confidence_threshold,
         preprocessing_mode=config.preprocessing_mode,
     )
     mv_pred_list: list[MultiviewPred] = vggt_predictor(rgb_list=rgb_list)
 
-    pointcloud = mv_pred_list[0].pointcloud
-    pc_conf_mask = mv_pred_list[0].pointcloud_conf
+    ###
+    mv_pred_list = orient_mv_pred_list(mv_pred_list)
 
-    filtered_points = np.asarray(pointcloud.points)[pc_conf_mask]
-    filtered_colors = np.asarray(pointcloud.colors)[pc_conf_mask]
+    # multidepth_to_points requires world_T_cam not cam_T_world
+    world_T_cam_b44: Float32[ndarray, "num_cams 4 4"] = np.stack(
+        [mv_pred.pinhole_param.extrinsics.world_T_cam for mv_pred in mv_pred_list], axis=0
+    ).astype(np.float32)
+    K_b33: Float32[ndarray, "b 3 3"] = np.stack(
+        [mv_pred.pinhole_param.intrinsics.k_matrix for mv_pred in mv_pred_list], axis=0
+    ).astype(np.float32)
+    depth_maps: Float32[ndarray, "b h w 1"] = np.stack(
+        [rearrange(mv_pred.depth_map, "h w -> h w 1") for mv_pred in mv_pred_list], axis=0
+    ).astype(np.float32)
+    world_points: Float32[ndarray, "b h w 3"] = multidepth_to_points(
+        depth_maps=depth_maps, world_T_cam_batch=world_T_cam_b44, K_b33=K_b33
+    )
+    ###
+
+    depth_confidences: list[UInt8[ndarray, "H W"]] = [
+        robust_filter_confidences(mv_pred.confidence_mask, keep_top_percent=config.keep_top_percent)
+        for mv_pred in mv_pred_list
+    ]
+
+    pointcloud: Float32[ndarray, "num_points 3"] = world_points.reshape(-1, 3)
+    rgb_stack: UInt8[ndarray, "num_points 3"] = np.concatenate(
+        [rearrange(mv_pred.rgb_image, "h w c -> (h w) c") for mv_pred in mv_pred_list]
+    )
+    pc_conf_mask: Bool[ndarray, "num_points"] = np.concatenate(
+        [rearrange(depth_conf, "h w -> (h w)") for depth_conf in depth_confidences]
+    ).astype(bool)
+
+    # Filter by confidence BEFORE downsampling for better quality and efficiency
+    filtered_points_pre_ds: Float32[ndarray, "filtered_points 3"] = pointcloud[pc_conf_mask]
+    filtered_colors_pre_ds: UInt8[ndarray, "filtered_points 3"] = rgb_stack[pc_conf_mask]
+
+    # Create point cloud from high-confidence points only
+    pcd: o3d.geometry.PointCloud = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(filtered_points_pre_ds)
+    pcd.colors = o3d.utility.Vector3dVector(filtered_colors_pre_ds / 255.0)  # Open3D expects [0,1] range
+
+    # Automatically determine optimal voxel size based on point cloud characteristics
+    voxel_size: float = estimate_voxel_size(filtered_points_pre_ds, target_points=200_000)
+    pcd_ds = pcd.voxel_down_sample(voxel_size)
+
+    filtered_points: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.points, dtype=np.float32)
+    filtered_colors: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.colors, dtype=np.float32)
 
     rr.log(
         f"{parent_log_path}/point_cloud",
@@ -222,38 +460,39 @@ def run_inference(config: VGGTInferenceConfig) -> None:
     )
 
     intri_stack_list: list[Float32[ndarray, "3 3"]] = []
+
     mv_pred: MultiviewPred
     for mv_pred in mv_pred_list:
         cam_log_path: Path = parent_log_path / mv_pred.cam_name
+        pinhole_log_path: Path = cam_log_path / "pinhole"
 
-        mask: Float32[ndarray, "H W"] = mv_pred.confidence_mask.astype(np.float32)
-        depth_map: UInt16[ndarray, "H W"] = mv_pred.depth_map
+        depth_map: Float32[ndarray, "H W"] = mv_pred.depth_map
+        depth_conf: UInt8[ndarray, "H W"] = depth_confidences[mv_pred_list.index(mv_pred)]
 
-        # Filter the depth map based on confidence mask
-        filtered_depth_map = np.where(mask > 0, depth_map, 0)
+        # Filter depth
+        filtered_depth_map: Float32[ndarray, "H W"] = np.where(depth_conf > 0, depth_map, 0)
 
         log_pinhole(
             mv_pred.pinhole_param,
             cam_log_path=cam_log_path,
-            image_plane_distance=100.0,
+            image_plane_distance=0.1,
             static=True,
         )
-
         intri_stack_list.append(mv_pred.pinhole_param.intrinsics.k_matrix)
 
-        rr.log(f"{cam_log_path}/pinhole/image", rr.Image(mv_pred.rgb_image, color_model=rr.ColorModel.RGB), static=True)
+        rr.log(f"{pinhole_log_path}/image", rr.Image(mv_pred.rgb_image, color_model=rr.ColorModel.RGB), static=True)
         rr.log(
-            f"{cam_log_path}/pinhole/confidence",
-            rr.Image(mask, draw_order=-10),
+            f"{pinhole_log_path}/confidence",
+            rr.Image(depth_conf, color_model=rr.ColorModel.L),
             static=True,
         )
         rr.log(
-            f"{cam_log_path}/pinhole/depth",
-            rr.DepthImage(filtered_depth_map, draw_order=1),
+            f"{pinhole_log_path}/depth",
+            rr.DepthImage(filtered_depth_map, meter=1),
             static=True,
         )
 
-    intri_stack = np.stack(intri_stack_list, axis=0, dtype=np.float32)
+    intri_stack: Float32[ndarray, "num_cams 3 3"] = np.stack(intri_stack_list, axis=0, dtype=np.float32)
 
     if config.output_dir is not None:
         config.output_dir.mkdir(parents=True, exist_ok=True)

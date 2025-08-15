@@ -21,7 +21,7 @@ from monopriors.rr_logging_utils import log_relative_pred
 class PredictorConfig:
     rr_config: RerunTyroConfig
     image_path: Path = Path("data/images/frame_00001.png")
-    predictor_name: RELATIVE_PREDICTORS = "DepthAnythingV2Predictor"
+    predictor_name: RELATIVE_PREDICTORS = "MogeV1Predictor"
 
 
 def resize_image(image: np.ndarray, max_dim: int = 1024) -> np.ndarray:

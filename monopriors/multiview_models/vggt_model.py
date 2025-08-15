@@ -4,10 +4,9 @@ from typing import Literal, TypedDict
 
 import cv2
 import numpy as np
-import open3d as o3d
 import torch
 from einops import rearrange
-from jaxtyping import Bool, Float32, UInt8, UInt16
+from jaxtyping import Float32, UInt8
 from numpy import ndarray
 from PIL import Image
 from serde import field as serde_field
@@ -16,8 +15,9 @@ from simplecv.camera_parameters import Extrinsics, Intrinsics, PinholeParameters
 from torch import Tensor
 from torchvision import transforms as TF
 from vggt.models.vggt import VGGT
-from vggt.utils.geometry import unproject_depth_map_to_point_map
 from vggt.utils.pose_enc import pose_encoding_to_extri_intri
+
+from monopriors.depth_utils import multidepth_to_points
 
 
 class PreprocessingMetadata(TypedDict):
@@ -37,7 +37,7 @@ class VGGTPredictions:
     world_points_conf: Float32[ndarray, "*batch num_cams H W"]
     images: Float32[ndarray, "*batch num_cams 3 H W"]
     intrinsic: Float32[ndarray, "*batch num_cams 3 3"]
-    cam_T_world: Float32[ndarray, "*batch num_cams 3 4"] = serde_field(rename="extrinsic")
+    cam_T_world_b34: Float32[ndarray, "*batch num_cams 3 4"] = serde_field(rename="extrinsic")
 
     def remove_batch_dim_if_one(self) -> "VGGTPredictions":
         """
@@ -56,16 +56,22 @@ class VGGTPredictions:
             world_points=self.world_points.squeeze(0),
             world_points_conf=self.world_points_conf.squeeze(0),
             images=self.images.squeeze(0),
-            cam_T_world=self.cam_T_world.squeeze(0),
+            cam_T_world_b34=self.cam_T_world_b34.squeeze(0),
             intrinsic=self.intrinsic.squeeze(0),
         )
         return result
 
 
+@dataclass
+class PreprocessResults:
+    images: Float32[torch.Tensor, "N 3 H W"]
+    metadata: list[PreprocessingMetadata]
+
+
 def preprocess_images(
     rgb_list: list[UInt8[ndarray, "H W 3"]],
     mode: Literal["crop", "pad"] = "crop",
-) -> tuple[Float32[torch.Tensor, "N 3 H W"], list[PreprocessingMetadata]]:
+) -> PreprocessResults:
     """
     A quick start function to preprocess images for model input.
 
@@ -120,14 +126,16 @@ def preprocess_images(
                 new_height = round(original_height * (new_width / original_width) / 14) * 14  # Make divisible by 14
             else:
                 new_height = target_size
-                new_width = round(original_width * (new_height / original_height) / 14) * 14  # Make divisible by 14
+                new_width: int = (
+                    round(original_width * (new_height / original_height) / 14) * 14
+                )  # Make divisible by 14
 
             metadata["new_size"] = (new_width, new_height)
             # Calculate padding
-            pad_top = (target_size - new_height) // 2
-            pad_bottom = target_size - new_height - pad_top
-            pad_left = (target_size - new_width) // 2
-            pad_right = target_size - new_width - pad_left
+            pad_top: int = (target_size - new_height) // 2
+            pad_bottom: int = target_size - new_height - pad_top
+            pad_left: int = (target_size - new_width) // 2
+            pad_right: int = target_size - new_width - pad_left
 
             metadata["padding"] = {"top": pad_top, "bottom": pad_bottom, "left": pad_left, "right": pad_right}
 
@@ -208,7 +216,7 @@ def preprocess_images(
     if len(rgb_list) == 1 and images.dim() == 3:
         images = images.unsqueeze(0)
 
-    return images, metadata_list
+    return PreprocessResults(images=images, metadata=metadata_list)
 
 
 def remove_padding_from_prediction(
@@ -226,9 +234,10 @@ def remove_padding_from_prediction(
         The unpadded array/tensor
     """
     # Get padding values
-    pad_top = metadata["padding"]["top"]
-    pad_left = metadata["padding"]["left"]
-    new_width, new_height = metadata["new_size"]
+    pad_top: int = metadata["padding"]["top"]
+    pad_left: int = metadata["padding"]["left"]
+    new_width: int = metadata["new_size"][0]
+    new_height: int = metadata["new_size"][1]
 
     if metadata["mode"] == "pad":
         # For pad mode, we need to crop out the padding
@@ -254,17 +263,13 @@ class MultiviewPred:
         rgb_image (UInt8[ndarray, "H W 3"]): RGB image.
         depth_map (UInt16[ndarray, "H W"]): Depth map computed from multi-view structure-from-motion.
             The depth values are scale-consistent across views, but only accurate up to an unknown global scale factor.
-        confidence_mask (UInt8[ndarray, "H W"]): Confidence mask.
-        pointcloud (o3d.geometry.PointCloud): Point cloud derived from the depth maps.
         pinhole_param (PinholeParameters): Pinhole camera parameters.
     """
 
     cam_name: str
     rgb_image: UInt8[ndarray, "H W 3"]
-    depth_map: UInt16[ndarray, "H W"]
-    confidence_mask: UInt8[ndarray, "H W"]
-    pointcloud: o3d.geometry.PointCloud
-    pointcloud_conf: Bool[ndarray, "num_points"]
+    depth_map: Float32[ndarray, "H W"]
+    confidence_mask: Float32[ndarray, "H W"]
     pinhole_param: PinholeParameters
 
 
@@ -272,17 +277,24 @@ def generate_multiview_pred(
     pred_class: VGGTPredictions,
     img_tensors: Float32[Tensor, "num_img 3 resized_h resized_w"],
     rgb_list: list[UInt8[ndarray, "original_h original_w 3"]],
-    confidence_threshold: int | float,
     metadata_list: list[PreprocessingMetadata] | None = None,
 ) -> list[MultiviewPred]:
     pred_class = pred_class.remove_batch_dim_if_one()
-    assert len(pred_class.cam_T_world.shape) == 3, "Currently batch size of 1 is only supported"
+    assert len(pred_class.cam_T_world_b34.shape) == 3, "Currently batch size of 1 is only supported"
 
     # Generate world points from depth map, this is usually more accurate than the world points from pose encoding
     depth_maps: Float32[ndarray, "num_cams resized_h resized_w 1"] = pred_class.depth
-    world_points: Float32[ndarray, "num_cams resized_h resized_w 3"] = unproject_depth_map_to_point_map(
-        depth_maps, pred_class.cam_T_world, pred_class.intrinsic
-    ).astype(np.float32)
+    # Convert batch of (3x4) cam_T_world matrices to homogeneous (4x4)
+    cam_T_world_b34: Float32[ndarray, "num_cams 3 4"] = pred_class.cam_T_world_b34.astype(np.float32)
+    num_cams = cam_T_world_b34.shape[0]
+    # Create bottom homogeneous row [0,0,0,1] for each camera
+    bottom_row: Float32[ndarray, "num_cams 1 4"] = np.tile(np.array([[0, 0, 0, 1]], dtype=np.float32), (num_cams, 1, 1))
+    # multidepth_to_points requires world_T_cam not cam_T_world
+    cam_T_world_b44: Float32[ndarray, "num_cams 4 4"] = np.concatenate([cam_T_world_b34, bottom_row], axis=1)
+    world_T_cam_b44: Float32[ndarray, "num_cams 4 4"] = np.linalg.inv(cam_T_world_b44)
+    world_points: Float32[ndarray, "b h w 3"] = multidepth_to_points(
+        depth_maps=depth_maps, world_T_cam_batch=world_T_cam_b44, K_b33=pred_class.intrinsic
+    )
 
     # Get colors from original images and reshape them to match points
     processed_imgs: Float32[ndarray, "num_cams 3 resized_h resized_w"] = img_tensors.numpy(force=True)
@@ -308,8 +320,8 @@ def generate_multiview_pred(
 
             # Also need to update camera intrinsics to account for removed padding
             if metadata_list[i]["mode"] == "pad":
-                pad_left = metadata_list[i]["padding"]["left"]
-                pad_top = metadata_list[i]["padding"]["top"]
+                pad_left: int = metadata_list[i]["padding"]["left"]
+                pad_top: int = metadata_list[i]["padding"]["top"]
 
                 # Adjust principal point to account for removed padding
                 pred_class.intrinsic[i, 0, 2] -= pad_left
@@ -319,42 +331,15 @@ def generate_multiview_pred(
         depth_maps = np.array(unpadded_depth_maps)
         world_points = np.array(unpadded_world_points)
         processed_imgs = np.array(unpadded_processed_imgs)
-        depth_confs = np.array(unpadded_depth_confs)
+        depth_confs: Float32[ndarray, "num_cams _ _"] = np.array(unpadded_depth_confs)
     else:
-        depth_confs = pred_class.depth_conf
-
-    # Now create the point cloud from all unpadded data
-    # Flatten both points and colors
-    flattened_points: Float32[ndarray, "num_points 3"] = rearrange(
-        world_points,
-        "num_cams resized_h resized_w C -> (num_cams resized_h resized_w) C",
-    )
-    flattened_colors: Float32[ndarray, "num_points 3"] = rearrange(
-        processed_imgs,
-        "num_cams resized_h resized_w C -> (num_cams resized_h resized_w) C",
-    )
-
-    conf: Float32[ndarray, "num_points"] = depth_confs.reshape(-1)  # noqa UP037
-
-    # Convert percentage threshold to actual confidence value
-    conf_threshold = 0.0 if confidence_threshold == 0.0 else np.percentile(conf, confidence_threshold)
-    pc_conf_mask = (conf >= conf_threshold) & (conf > 1e-5)
-
-    vertices_3d: Float32[ndarray, "num_points 3"] = flattened_points
-    colors_rgb: Float32[ndarray, "num_points 3"] = flattened_colors
-
-    # Create an empty point cloud
-    pcd = o3d.geometry.PointCloud()
-
-    # Ensure your positions and colors are of the appropriate type (typically float64 for points)
-    pcd.points = o3d.utility.Vector3dVector(vertices_3d * 1000)  # Scale to allow saving as uint16 later on
-    pcd.colors = o3d.utility.Vector3dVector(colors_rgb)
+        depth_confs: Float32[ndarray, "num_cams _ _"] = pred_class.depth_conf
 
     mv_pred_list: list[MultiviewPred] = []
     for idx, (intri, extri, processed_img, original_img, depth_map, depth_conf) in enumerate(
         zip(
             pred_class.intrinsic,
-            pred_class.cam_T_world,
+            pred_class.cam_T_world_b34,
             processed_imgs,
             rgb_list,
             depth_maps,
@@ -372,30 +357,23 @@ def generate_multiview_pred(
             width=processed_img.shape[1],
             height=processed_img.shape[0],
         )
-        extri_param = Extrinsics(
-            cam_R_world=extri[:, :3],
-            cam_t_world=extri[:, 3] * 1000,  # to allow saving as uint16 later on
-        )
-        pinhole_param = PinholeParameters(name=cam_name, intrinsics=intri_param, extrinsics=extri_param)
-        conf_threshold = 0.0 if confidence_threshold == 0.0 else np.percentile(depth_conf, confidence_threshold)
-        conf_mask = (depth_conf >= conf_threshold) & (depth_conf > 1e-5)
-        # filter depth map based on confidence
-        # depth_map[~conf_mask] = 0.0
+        extri: Extrinsics = Extrinsics(cam_R_world=extri[:, :3], cam_t_world=extri[:, 3])
+
+        pinhole_param = PinholeParameters(name=cam_name, intrinsics=intri_param, extrinsics=extri)
 
         depth_map = depth_map.squeeze()
-        # resize image, confidence mask and depth map to original image size
         # Use INTER_LINEAR for the processed RGB image (standard for color images)
-        processed_img = cv2.resize(
+        processed_img: Float32[ndarray, "orig_h orig_w 3"] = cv2.resize(
             processed_img, (original_img.shape[1], original_img.shape[0]), interpolation=cv2.INTER_LINEAR
         )
         # Use INTER_NEAREST for the confidence mask to preserve binary values
-        conf_mask = cv2.resize(
-            conf_mask.astype(np.float32),
+        conf_mask: Float32[ndarray, "orig_h orig_w"] = cv2.resize(
+            depth_conf.astype(np.float32),
             (original_img.shape[1], original_img.shape[0]),
             interpolation=cv2.INTER_NEAREST,
         )
         # Use INTER_NEAREST for depth map to preserve discontinuities and avoid floating artifacts
-        depth_map = cv2.resize(
+        depth_map: Float32[ndarray, "orig_h orig_w"] = cv2.resize(
             depth_map, (original_img.shape[1], original_img.shape[0]), interpolation=cv2.INTER_NEAREST
         )
 
@@ -407,17 +385,19 @@ def generate_multiview_pred(
         )
 
         # Normalize the processed image to [0, 1] range
-        normalized = (processed_img - processed_img.min()) / (processed_img.max() - processed_img.min())
-        rgb_image = (normalized * 255).clip(0, 255).astype(np.uint8)
-        # convert depth map to UInt16, this means we need to multiply by 1000 the point cloud, extrinsics, and depth map
+        normalized: Float32[ndarray, "orig_h orig_w 3"] = (processed_img - processed_img.min()) / (
+            processed_img.max() - processed_img.min()
+        )
+        rgb_image: UInt8[ndarray, "orig_h orig_w 3"] = (normalized * 255).clip(0, 255).astype(np.uint8)
         mv_pred_list.append(
             MultiviewPred(
                 cam_name=cam_name,
                 rgb_image=rgb_image,
-                depth_map=(depth_map * 1000).astype(np.uint16),  # convert to uint16
-                confidence_mask=(conf_mask * 255).astype(np.uint8),
-                pointcloud=pcd,
-                pointcloud_conf=pc_conf_mask,
+                depth_map=depth_map,  # convert to uint16
+                # confidence_mask=(conf_mask * 255).astype(np.uint8),
+                confidence_mask=conf_mask,
+                # pointcloud=pcd,
+                # pointcloud_conf=pc_conf_mask,
                 pinhole_param=pinhole_param,
             )
         )
@@ -429,21 +409,19 @@ class VGGTPredictor:
     def __init__(
         self,
         device: Literal["cpu", "cuda"],
-        confidence_threshold: int | float = 50.0,
         preprocessing_mode: Literal["crop", "pad"] = "crop",
     ) -> None:
         self.device = device
-        self.confidence_threshold = confidence_threshold
-        self.preprocessing_mode = preprocessing_mode
+        self.preprocessing_mode: Literal["crop", "pad"] = preprocessing_mode
         load_start: float = timer()
         print("Loading model...")
-        self.model = VGGT.from_pretrained("facebook/VGGT-1B").to(self.device)
+        self.model: VGGT = VGGT.from_pretrained("facebook/VGGT-1B").to(self.device)
         print("Model loaded in", timer() - load_start, "seconds")
         self.dtype: torch.dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
 
     def __call__(self, rgb_list: list[UInt8[ndarray, "H W 3"]]) -> list[MultiviewPred]:
-        img_tensors, metadata_list = preprocess_images(rgb_list, mode=self.preprocessing_mode)
-        img_tensors = img_tensors.to(self.device)
+        preprocess_results: PreprocessResults = preprocess_images(rgb_list, mode=self.preprocessing_mode)
+        img_tensors: Float32[torch.Tensor, "N 3 H W"] = preprocess_results.images.to(self.device)
 
         # Run inference
         print("Running inference...")
@@ -464,11 +442,11 @@ class VGGTPredictor:
 
         # Convert from dict to dataclass and performs runtime type validation for easy access
         pred_class: VGGTPredictions = from_dict(VGGTPredictions, predictions)
+
         calibration_data: list[MultiviewPred] = generate_multiview_pred(
             pred_class,
             img_tensors=img_tensors,
             rgb_list=rgb_list,
-            confidence_threshold=self.confidence_threshold,
-            metadata_list=metadata_list if self.preprocessing_mode == "pad" else None,
+            metadata_list=preprocess_results.metadata if self.preprocessing_mode == "pad" else None,
         )
         return calibration_data
