@@ -16,18 +16,144 @@ from numpy import ndarray
 from scipy.spatial.transform import Rotation
 from simplecv.camera_parameters import Extrinsics
 from simplecv.ops.conventions import CameraConventions, convert_pose
+from simplecv.ops.tsdf_depth_fuser import Open3DFuser
 from simplecv.rerun_log_utils import RerunTyroConfig, log_pinhole
 from torch import Tensor
 from tqdm.auto import trange
 
 from monopriors.camera_utils import auto_orient_and_center_poses
-from monopriors.depth_utils import multidepth_to_points
-from monopriors.multiview_models.vggt_model import MultiviewPred, VGGTPredictor
+from monopriors.depth_utils import depth_edges_mask, multidepth_to_points
+from monopriors.multiview_models.vggt_model import MultiviewPred, VGGTPredictor, robust_filter_confidences
+from monopriors.relative_depth_models import (
+    RelativeDepthPrediction,
+    get_relative_predictor,
+)
+from monopriors.relative_depth_models.base_relative_depth import BaseRelativePredictor
+from monopriors.scale_utils import compute_scale_and_shift
 
 np.set_printoptions(suppress=True)
 
 SUPPORTED_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg")
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def create_depth_views(parent_log_path: Path, camera_index: int) -> rrb.Tabs:
+    """
+    Create depth visualization tabs for a specific camera.
+
+    Args:
+        parent_log_path: Parent log path for the camera views
+        camera_index: Index of the camera to create depth views for
+
+    Returns:
+        Tabs blueprint containing depth and filtered depth views
+    """
+    depth_views: rrb.Tabs = rrb.Tabs(
+        contents=[
+            rrb.Spatial2DView(
+                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/depth",
+                contents=[
+                    "+ $origin/**",
+                ],
+                name="Depth",
+            ),
+            rrb.Spatial2DView(
+                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/filtered_depth",
+                contents=[
+                    "+ $origin/**",
+                ],
+                name="Filtered Depth",
+            ),
+            rrb.Spatial2DView(
+                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/moge_depth",
+                contents=[
+                    "+ $origin/**",
+                ],
+                name="MoGe Depth",
+            ),
+        ]
+    )
+    return depth_views
+
+
+def create_camera_row(parent_log_path: Path, camera_index: int) -> rrb.Horizontal:
+    """
+    Create a single camera row with 3 views: content, depth, and confidence.
+
+    Args:
+        parent_log_path: Parent log path for the camera views
+        camera_index: Index of the camera to create views for
+
+    Returns:
+        Horizontal blueprint containing pinhole content, depth views, and confidence map
+    """
+    camera_row: rrb.Horizontal = rrb.Horizontal(
+        contents=[
+            rrb.Spatial2DView(
+                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/",
+                contents=[
+                    "+ $origin/**",
+                ],
+                name="Pinhole Content",
+            ),
+            create_depth_views(parent_log_path, camera_index),
+            rrb.Spatial2DView(
+                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/confidence",
+                contents=[
+                    "+ $origin/**",
+                ],
+                name="Confidence Map",
+            ),
+        ]
+    )
+    return camera_row
+
+
+def chunk_cameras(num_cameras: int, chunk_size: int = 4) -> list[range]:
+    """
+    Group cameras into chunks of specified size.
+
+    Args:
+        num_cameras: Total number of cameras
+        chunk_size: Maximum cameras per chunk (default 4)
+
+    Returns:
+        List of ranges representing camera chunks
+    """
+    chunks: list[range] = [range(i, min(i + chunk_size, num_cameras)) for i in range(0, num_cameras, chunk_size)]
+    return chunks
+
+
+def create_tabbed_camera_view(parent_log_path: Path, num_cameras: int) -> rrb.Tabs:
+    """
+    Create tabbed interface grouping cameras by 4s.
+
+    Args:
+        parent_log_path: Parent log path for the camera views
+        num_cameras: Total number of cameras to display
+
+    Returns:
+        Tabs blueprint with each tab containing up to 4 camera rows
+    """
+    camera_chunks: list[range] = chunk_cameras(num_cameras)
+
+    tabs: list[rrb.Vertical] = []
+    for camera_range in camera_chunks:
+        # Create camera rows for this chunk
+        camera_rows: list[rrb.Horizontal] = [create_camera_row(parent_log_path, i) for i in camera_range]
+
+        # Create tab name
+        if camera_range.start + 1 == camera_range.stop:
+            tab_name: str = f"Camera {camera_range.start + 1}"
+        else:
+            tab_name = f"Cameras {camera_range.start + 1}-{camera_range.stop}"
+
+        # Create tab content
+        tab_content: rrb.Vertical = rrb.Vertical(contents=camera_rows, name=tab_name)
+        tabs.append(tab_content)
+
+    tabbed_view: rrb.Tabs = rrb.Tabs(contents=tabs)
+    return tabbed_view
 
 
 def create_blueprint(parent_log_path: Path, image_paths: list[Path]) -> rrb.Blueprint:
@@ -37,35 +163,17 @@ def create_blueprint(parent_log_path: Path, image_paths: list[Path]) -> rrb.Blue
             "+ $origin/**",
             # don't include depths in the 3D view, as they can be very noisy
             *[f"- /{parent_log_path}/camera_{i}/pinhole/depth" for i in range(len(image_paths))],
+            *[f"- /{parent_log_path}/camera_{i}/pinhole/filtered_depth" for i in range(len(image_paths))],
+            *[f"- /{parent_log_path}/camera_{i}/pinhole/moge_depth" for i in range(len(image_paths))],
+            *[f"- /{parent_log_path}/camera_{i}/pinhole/confidence" for i in range(len(image_paths))],
         ],
         line_grid=rrb.archetypes.LineGrid3D(visible=False),
     )
-    view2d = rrb.Vertical(
-        contents=[
-            rrb.Horizontal(
-                contents=[
-                    rrb.Spatial2DView(
-                        origin=f"{parent_log_path}/camera_{i}/pinhole/",
-                        contents=[
-                            "+ $origin/**",
-                        ],
-                        name="Pinhole Content",
-                    ),
-                    rrb.Spatial2DView(
-                        origin=f"{parent_log_path}/camera_{i}/pinhole/confidence",
-                        contents=[
-                            "+ $origin/**",
-                        ],
-                        name="Confidence Map",
-                    ),
-                ]
-            )
-            # show at most 4 cameras
-            for i in range(min(4, len(image_paths)))
-        ]
-    )
 
-    blueprint = rrb.Blueprint(rrb.Horizontal(contents=[view3d, view2d], column_shares=[3, 1]), collapse_panels=True)
+    # Create tabbed view that supports any number of cameras
+    view2d: rrb.Tabs = create_tabbed_camera_view(parent_log_path, len(image_paths))
+
+    blueprint = rrb.Blueprint(rrb.Horizontal(contents=[view3d, view2d], column_shares=[3, 2]), collapse_panels=True)
     return blueprint
 
 
@@ -231,66 +339,6 @@ class VGGTInferenceConfig:
     """Mode for image preprocessing: 'crop' preserves aspect ratio, 'pad' adds white padding"""
     output_dir: Path | None = None
     """Output directory for colmap version. If None, results are not saved."""
-
-
-def filter_confidences(confidence: Float32[ndarray, "H W"], keep_top_percent: int | float) -> UInt8[ndarray, "H W"]:
-    """
-    Create a confidence mask by keeping the top percentage of pixels.
-
-    Args:
-        confidence: 2D confidence map where higher values indicate higher confidence
-        keep_top_percent: Percentage of pixels to keep (0-100). E.g., 25.0 keeps top 25%
-
-    Returns:
-        Binary mask as UInt8 array with values 0 (filtered out) or 255 (kept)
-
-    Notes:
-        - Uses percentile-based thresholding: pixels >= (100 - keep_top_percent) percentile
-        - Also filters out very low confidence values (< 1e-5) regardless of percentile
-    """
-    conf_threshold: float = float(np.percentile(confidence, 100.0 - keep_top_percent))
-    mask: Bool[ndarray, "H W"] = (confidence >= conf_threshold) & (confidence > 1e-5)
-    mask: UInt8[ndarray, "H W"] = (mask * 255).astype(np.uint8)
-    return mask
-
-
-def robust_filter_confidences(
-    confidence: Float32[ndarray, "H W"], keep_top_percent: int | float
-) -> UInt8[ndarray, "H W"]:
-    """
-    Robust confidence filtering that handles edge cases in percentile-based thresholding.
-
-    This function addresses the issue where standard percentile thresholding can overshoot
-    the target percentage when many pixels share the same confidence value as the percentile
-    pivot (e.g., in nearly constant confidence maps).
-
-    Args:
-        confidence: 2D confidence map where higher values indicate higher confidence
-        keep_top_percent: Target percentage of pixels to keep (0-100)
-
-    Returns:
-        Binary mask as UInt8 array with values 0 (filtered out) or 255 (kept)
-
-    Notes:
-        - Iteratively reduces the percentile threshold until the actual kept percentage
-          is within tolerance (±10 percentage points) of the target
-        - Uses filter_confidences() internally for the actual filtering
-        - Handles degenerate cases like uniform confidence distributions
-        - May keep slightly fewer pixels than requested to avoid significant overshoot
-    """
-
-    keep_top_percent: int | float = keep_top_percent
-    mask: UInt8[ndarray, "H W"] = filter_confidences(confidence, keep_top_percent)
-    # check percentage of values in masks that are 255
-    percentage_255: float = float(100.0 * np.sum(mask == 255) / mask.size)
-    tol: float = 10.0  # allowable deviation in percentage points
-    target: float = float(keep_top_percent)
-    while percentage_255 >= target + tol:
-        keep_top_percent -= 1.0
-        mask: UInt8[ndarray, "H W"] = filter_confidences(confidence, keep_top_percent)
-        percentage_255: float = float(100.0 * np.sum(mask == 255) / mask.size)
-
-    return mask
 
 
 def estimate_voxel_size(
@@ -459,8 +507,9 @@ def run_inference(config: VGGTInferenceConfig) -> None:
         static=True,
     )
 
+    predictor: BaseRelativePredictor = get_relative_predictor("MogeV1Predictor")(device="cuda")
     intri_stack_list: list[Float32[ndarray, "3 3"]] = []
-
+    moge_list: list[Float32[ndarray, "H W"]] = []
     mv_pred: MultiviewPred
     for mv_pred in mv_pred_list:
         cam_log_path: Path = parent_log_path / mv_pred.cam_name
@@ -472,6 +521,20 @@ def run_inference(config: VGGTInferenceConfig) -> None:
         # Filter depth
         filtered_depth_map: Float32[ndarray, "H W"] = np.where(depth_conf > 0, depth_map, 0)
 
+        relative_pred: RelativeDepthPrediction = predictor.__call__(
+            rgb=mv_pred.rgb_image, K_33=mv_pred.pinhole_param.intrinsics.k_matrix
+        )
+
+        scale, shift = compute_scale_and_shift(
+            relative_pred.depth, filtered_depth_map, mask=depth_conf > 0, scale_only=False
+        )
+        moge_depth: Float32[np.ndarray, "h w"] = relative_pred.depth * scale + shift
+        # filter depth
+        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(moge_depth, threshold=0.01)
+        moge_depth: Float32[np.ndarray, "h w"] = moge_depth * ~edges_mask
+
+        moge_list.append(moge_depth)
+
         log_pinhole(
             mv_pred.pinhole_param,
             cam_log_path=cam_log_path,
@@ -480,17 +543,71 @@ def run_inference(config: VGGTInferenceConfig) -> None:
         )
         intri_stack_list.append(mv_pred.pinhole_param.intrinsics.k_matrix)
 
-        rr.log(f"{pinhole_log_path}/image", rr.Image(mv_pred.rgb_image, color_model=rr.ColorModel.RGB), static=True)
+        rr.log(
+            f"{pinhole_log_path}/image",
+            rr.Image(mv_pred.rgb_image, color_model=rr.ColorModel.RGB).compress(),
+            static=True,
+        )
         rr.log(
             f"{pinhole_log_path}/confidence",
-            rr.Image(depth_conf, color_model=rr.ColorModel.L),
+            rr.Image(depth_conf, color_model=rr.ColorModel.L).compress(),
+            static=True,
+        )
+        rr.log(
+            f"{pinhole_log_path}/filtered_depth",
+            rr.DepthImage(filtered_depth_map, meter=1),
             static=True,
         )
         rr.log(
             f"{pinhole_log_path}/depth",
-            rr.DepthImage(filtered_depth_map, meter=1),
+            rr.DepthImage(depth_map, meter=1),
             static=True,
         )
+        rr.log(
+            f"{pinhole_log_path}/moge_depth",
+            rr.DepthImage(moge_depth, meter=1),
+            static=True,
+        )
+
+    # stack moge depth into a pointcloud, and downscale it similar to the original pointcloud, log ti as moge pointcloud
+    world_T_cam_b44: Float32[ndarray, "num_cams 4 4"] = np.stack(
+        [mv_pred.pinhole_param.extrinsics.world_T_cam for mv_pred in mv_pred_list], axis=0
+    ).astype(np.float32)
+    K_b33: Float32[ndarray, "b 3 3"] = np.stack(
+        [mv_pred.pinhole_param.intrinsics.k_matrix for mv_pred in mv_pred_list], axis=0
+    ).astype(np.float32)
+    moge_depth_maps: Float32[ndarray, "b h w 1"] = np.stack(
+        [rearrange(moge_depth, "h w -> h w 1") for moge_depth in moge_list], axis=0
+    ).astype(np.float32)
+    moge_points: Float32[ndarray, "b h w 3"] = multidepth_to_points(
+        depth_maps=moge_depth_maps, world_T_cam_batch=world_T_cam_b44, K_b33=K_b33
+    )
+
+    new_pc: Float32[ndarray, "num_points 3"] = moge_points.reshape(-1, 3)
+    rgb_stack: UInt8[ndarray, "num_points 3"] = np.concatenate(
+        [rearrange(mv_pred.rgb_image, "h w c -> (h w) c") for mv_pred in mv_pred_list]
+    )
+
+    # Create point cloud from high-confidence points only
+    pcd: o3d.geometry.PointCloud = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(new_pc)
+    pcd.colors = o3d.utility.Vector3dVector(rgb_stack / 255.0)  # Open3D expects [0,1] range
+
+    # Automatically determine optimal voxel size based on point cloud characteristics
+    voxel_size: float = estimate_voxel_size(new_pc, target_points=500_000)
+    pcd_ds = pcd.voxel_down_sample(voxel_size)
+
+    filtered_points: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.points, dtype=np.float32)
+    filtered_colors: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.colors, dtype=np.float32)
+
+    rr.log(
+        f"{parent_log_path}/moge_point_cloud",
+        rr.Points3D(
+            filtered_points,
+            colors=filtered_colors,
+        ),
+        static=True,
+    )
 
     intri_stack: Float32[ndarray, "num_cams 3 3"] = np.stack(intri_stack_list, axis=0, dtype=np.float32)
 

@@ -51,7 +51,7 @@ class MogeV1Predictor(BaseRelativePredictor):
         cy = float(normalized_k[1, 2] * h)
 
         K_33: Float[np.ndarray, "3 3"] = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float32)
-        points: Float[np.ndarray, "h w 3"] = output["points"].numpy(force=True)
+        _: Float[np.ndarray, "h w 3"] = output["points"].numpy(force=True)
         relative_depth: Float[np.ndarray, "h w"] = output["depth"].numpy(force=True)
         mask: Float[np.ndarray, "h w"] = output["mask"].numpy(force=True).astype(np.float32)
 

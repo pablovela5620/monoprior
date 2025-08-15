@@ -16,6 +16,7 @@ def log_relative_pred(
     relative_pred: RelativeDepthPrediction,
     rgb_hw3: UInt8[np.ndarray, "h w 3"],
     remove_flying_pixels: bool = True,
+    log_disparity: bool = False,
     jpeg_quality: int = 90,
     depth_edge_threshold: int | float = 1.1,
 ) -> None:
@@ -45,17 +46,23 @@ def log_relative_pred(
     rr.log(f"{pinhole_path}/image", rr.Image(rgb_hw3).compress(jpeg_quality=jpeg_quality))
 
     depth_hw: Float32[np.ndarray, "h w"] = relative_pred.depth
+    # filter out any inf/nan values
+    depth_hw = np.nan_to_num(depth_hw, nan=0.0, posinf=0.0, neginf=0.0)
+
     if remove_flying_pixels:
         edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(depth_hw, threshold=depth_edge_threshold)
         depth_hw: Float32[np.ndarray, "h w"] = depth_hw * ~edges_mask
 
     rr.log(f"{pinhole_path}/depth", rr.DepthImage(depth_hw))
 
-    # removes outliers from disparity (sometimes we can get weirdly large values)
-    clipped_disparity: UInt8[np.ndarray, "h w"] = clip_disparity(relative_pred.disparity)
+    confidence_hw: Bool[np.ndarray, "h w"] = relative_pred.confidence > 0.5
+    rr.log(f"{pinhole_path}/confidence", rr.Image((confidence_hw * 255).astype(np.uint8)))
 
-    # log to cam_log_path to avoid backprojecting disparity
-    rr.log(f"{cam_log_path}/disparity", rr.DepthImage(clipped_disparity))
+    if log_disparity:
+        # removes outliers from disparity (sometimes we can get weirdly large values)
+        clipped_disparity: UInt8[np.ndarray, "h w"] = clip_disparity(relative_pred.disparity)
+        # log to cam_log_path to avoid backprojecting disparity
+        rr.log(f"{cam_log_path}/disparity", rr.DepthImage(clipped_disparity))
 
     depth_1hw: Float32[np.ndarray, "1 h w"] = rearrange(depth_hw, "h w -> 1 h w")
     pts_3d: Float32[np.ndarray, "h w 3"] = depth_to_points(depth_1hw, relative_pred.K_33)

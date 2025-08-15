@@ -22,6 +22,7 @@ class PredictorConfig:
     rr_config: RerunTyroConfig
     image_path: Path = Path("data/images/frame_00001.png")
     predictor_name: RELATIVE_PREDICTORS = "MogeV1Predictor"
+    depth_edge_threshold: float = 0.1
 
 
 def resize_image(image: np.ndarray, max_dim: int = 1024) -> np.ndarray:
@@ -40,7 +41,7 @@ def relative_depth_from_img(config: PredictorConfig) -> None:
             rrb.Vertical(
                 rrb.Spatial2DView(origin=f"{parent_log_path}/camera/pinhole/image"),
                 rrb.Spatial2DView(origin=f"{parent_log_path}/camera/pinhole/depth"),
-                rrb.Spatial2DView(origin=f"{parent_log_path}/camera/disparity"),
+                rrb.Spatial2DView(origin=f"{parent_log_path}/camera/pinhole/confidence"),
             ),
             column_shares=[3, 1],
         ),
@@ -57,4 +58,4 @@ def relative_depth_from_img(config: PredictorConfig) -> None:
     relative_pred: RelativeDepthPrediction = predictor.__call__(rgb=rgb_hw3, K_33=None)
     rr.set_time("time", sequence=0)
     rr.log("/", rr.ViewCoordinates.RDF, static=True)
-    log_relative_pred(parent_log_path, relative_pred, rgb_hw3, depth_edge_threshold=0.1)
+    log_relative_pred(parent_log_path, relative_pred, rgb_hw3, depth_edge_threshold=config.depth_edge_threshold)

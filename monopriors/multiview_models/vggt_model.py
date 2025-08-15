@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import torch
 from einops import rearrange
-from jaxtyping import Float32, UInt8
+from jaxtyping import Bool, Float32, UInt8
 from numpy import ndarray
 from PIL import Image
 from serde import field as serde_field
@@ -251,6 +251,66 @@ def remove_padding_from_prediction(
         # In crop mode, padding values are used differently and might be negative
         # But we generally don't need to uncrop - we just need to resize later
         return pred
+
+
+def filter_confidences(confidence: Float32[ndarray, "H W"], keep_top_percent: int | float) -> UInt8[ndarray, "H W"]:
+    """
+    Create a confidence mask by keeping the top percentage of pixels.
+
+    Args:
+        confidence: 2D confidence map where higher values indicate higher confidence
+        keep_top_percent: Percentage of pixels to keep (0-100). E.g., 25.0 keeps top 25%
+
+    Returns:
+        Binary mask as UInt8 array with values 0 (filtered out) or 255 (kept)
+
+    Notes:
+        - Uses percentile-based thresholding: pixels >= (100 - keep_top_percent) percentile
+        - Also filters out very low confidence values (< 1e-5) regardless of percentile
+    """
+    conf_threshold: float = float(np.percentile(confidence, 100.0 - keep_top_percent))
+    mask: Bool[ndarray, "H W"] = (confidence >= conf_threshold) & (confidence > 1e-5)
+    mask: UInt8[ndarray, "H W"] = (mask * 255).astype(np.uint8)
+    return mask
+
+
+def robust_filter_confidences(
+    confidence: Float32[ndarray, "H W"], keep_top_percent: int | float
+) -> UInt8[ndarray, "H W"]:
+    """
+    Robust confidence filtering that handles edge cases in percentile-based thresholding.
+
+    This function addresses the issue where standard percentile thresholding can overshoot
+    the target percentage when many pixels share the same confidence value as the percentile
+    pivot (e.g., in nearly constant confidence maps).
+
+    Args:
+        confidence: 2D confidence map where higher values indicate higher confidence
+        keep_top_percent: Target percentage of pixels to keep (0-100)
+
+    Returns:
+        Binary mask as UInt8 array with values 0 (filtered out) or 255 (kept)
+
+    Notes:
+        - Iteratively reduces the percentile threshold until the actual kept percentage
+          is within tolerance (±10 percentage points) of the target
+        - Uses filter_confidences() internally for the actual filtering
+        - Handles degenerate cases like uniform confidence distributions
+        - May keep slightly fewer pixels than requested to avoid significant overshoot
+    """
+
+    keep_top_percent: int | float = keep_top_percent
+    mask: UInt8[ndarray, "H W"] = filter_confidences(confidence, keep_top_percent)
+    # check percentage of values in masks that are 255
+    percentage_255: float = float(100.0 * np.sum(mask == 255) / mask.size)
+    tol: float = 10.0  # allowable deviation in percentage points
+    target: float = float(keep_top_percent)
+    while percentage_255 >= target + tol:
+        keep_top_percent -= 1.0
+        mask: UInt8[ndarray, "H W"] = filter_confidences(confidence, keep_top_percent)
+        percentage_255: float = float(100.0 * np.sum(mask == 255) / mask.size)
+
+    return mask
 
 
 @dataclass

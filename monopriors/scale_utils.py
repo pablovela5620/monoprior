@@ -23,7 +23,7 @@ def compute_scale_and_shift(
     scale_only: bool = False,
 ) -> tuple[float, float]:
     if scale_only:
-        return compute_scale(prediction, target, mask), 0
+        return float(compute_scale(prediction, target, mask)), 0.0
     else:
         return compute_scale_and_shift_full(prediction, target, mask)
 
