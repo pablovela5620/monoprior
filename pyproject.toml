@@ -120,8 +120,15 @@ torchvision = { version = ">=0.20.1", index = "https://download.pytorch.org/whl/
 vggt = { git = "https://github.com/pablovela5620/vggt.git", rev = "5ed6ec88a951f27959f73bc72eb4b6dc7a028b0c" }
 moge = { git = "https://github.com/microsoft/MoGe.git" }
 
-# [tool.pixi.feature.app.dependencies]
-# gradio = "*"
+[tool.pixi.feature.dev.dependencies]
+pytest = ">=8.0.0,<9"
+hypothesis = ">=6.0.0,<7"
+
+[tool.pixi.feature.dev.tasks.tests]
+cmd = """
+    pytest -q
+    """
+description = "Run the full test suite (quiet). Use: pixi run -e dev tests"
 
 [tool.pixi.feature.app.pypi-dependencies]
 gradio-rerun = ">=0.23.1"
@@ -132,6 +139,7 @@ spaces = "*"
 [tool.pixi.environments]
 app = { features = ["app"], solve-group = "default" }
 spaces = { features = ["spaces"], solve-group = "app" }
+dev = { features = ["dev"], solve-group = "default" }
 
 [tool.ruff]
 line-length = 150

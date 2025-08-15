@@ -17,10 +17,9 @@ from scipy.spatial.transform import Rotation
 from simplecv.camera_parameters import Extrinsics
 from simplecv.ops.conventions import CameraConventions, convert_pose
 from simplecv.rerun_log_utils import RerunTyroConfig, log_pinhole
-from torch import Tensor
 from tqdm.auto import trange
 
-from monopriors.camera_utils import auto_orient_and_center_poses
+from monopriors.camera_numpy_utils import auto_orient_and_center_poses
 from monopriors.depth_utils import depth_edges_mask, multidepth_to_points
 from monopriors.multiview_models.vggt_model import MultiviewPred, VGGTPredictor, robust_filter_confidences
 from monopriors.relative_depth_models import (
@@ -281,34 +280,26 @@ def orient_mv_pred_list(
     extri_list: list[Extrinsics] = [mv_pred.pinhole_param.extrinsics for mv_pred in mv_pred_list]
 
     world_T_cam_batch: Float[ndarray, "*num_poses 4 4"] = np.stack([extri.world_T_cam for extri in extri_list])
-    # check if in opencv or opengl coordinate system
     assert len(set(mv_pred.pinhole_param.intrinsics.camera_conventions for mv_pred in mv_pred_list)) == 1
     if mv_pred_list[0].pinhole_param.intrinsics.camera_conventions == "RDF":
-        # convert to OpenGL
         world_T_cam_gl: Float[ndarray, "*num_poses 4 4"] = convert_pose(
             world_T_cam_batch, CameraConventions.CV, CameraConventions.GL
         )
-        world_T_cam_gl: Float[Tensor, "*num_poses 4 4"] = torch.tensor(world_T_cam_gl, dtype=torch.float32)
     else:
-        world_T_cam_gl: Float[Tensor, "*num_poses 4 4"] = torch.tensor(world_T_cam_batch, dtype=torch.float32)
+        world_T_cam_gl = world_T_cam_batch
 
-    # Run orientation (returns (N,3,4))
-    oriented_world_T_cam_3x4, orient_transform = auto_orient_and_center_poses(
-        world_T_cam_gl, method=method, center_method=center_method
+    # NumPy-only orientation (returns (N,3,4))
+    oriented_world_T_cam_3x4_np, _ = auto_orient_and_center_poses(
+        world_T_cam_gl.astype(np.float64), method=method, center_method=center_method
     )
 
-    N: int = oriented_world_T_cam_3x4.shape[0]
-    # Rebuild 4x4 oriented camera-to-world
-    oriented_world_T_cam_4x4: Float32[torch.Tensor, "N 4 4"] = torch.cat(
-        [
-            oriented_world_T_cam_3x4,
-            torch.tensor([[0, 0, 0, 1]], dtype=torch.float32).expand(N, 1, 4),
-        ],
-        dim=1,
-    )
-    # convert back to opencv
+    N: int = oriented_world_T_cam_3x4_np.shape[0]
+    bottom_row: Float[ndarray, "N 1 4"] = np.broadcast_to(np.array([[0.0, 0.0, 0.0, 1.0]]), (N, 1, 4))
+    oriented_world_T_cam_4x4_np: Float32[ndarray, "N 4 4"] = np.concatenate(
+        [oriented_world_T_cam_3x4_np, bottom_row], axis=1
+    ).astype(np.float32)
     oriented_world_T_cam_cv: Float[ndarray, "N 4 4"] = convert_pose(
-        oriented_world_T_cam_4x4.numpy(force=True), CameraConventions.GL, CameraConventions.CV
+        oriented_world_T_cam_4x4_np, CameraConventions.GL, CameraConventions.CV
     )
     # put back into mv pred list using replace
     oriented_mv_pred_list: list[MultiviewPred] = []
