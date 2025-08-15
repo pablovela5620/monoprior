@@ -16,7 +16,6 @@ from numpy import ndarray
 from scipy.spatial.transform import Rotation
 from simplecv.camera_parameters import Extrinsics
 from simplecv.ops.conventions import CameraConventions, convert_pose
-from simplecv.ops.tsdf_depth_fuser import Open3DFuser
 from simplecv.rerun_log_utils import RerunTyroConfig, log_pinhole
 from torch import Tensor
 from tqdm.auto import trange
@@ -172,7 +171,6 @@ def create_blueprint(parent_log_path: Path, image_paths: list[Path]) -> rrb.Blue
 
     # Create tabbed view that supports any number of cameras
     view2d: rrb.Tabs = create_tabbed_camera_view(parent_log_path, len(image_paths))
-
     blueprint = rrb.Blueprint(rrb.Horizontal(contents=[view3d, view2d], column_shares=[3, 2]), collapse_panels=True)
     return blueprint
 
@@ -299,7 +297,7 @@ def orient_mv_pred_list(
         world_T_cam_gl, method=method, center_method=center_method
     )
 
-    N = oriented_world_T_cam_3x4.shape[0]
+    N: int = oriented_world_T_cam_3x4.shape[0]
     # Rebuild 4x4 oriented camera-to-world
     oriented_world_T_cam_4x4: Float32[torch.Tensor, "N 4 4"] = torch.cat(
         [
@@ -423,6 +421,32 @@ def estimate_voxel_size(
     return float(best_voxel_size)
 
 
+def mv_pred_to_pointcloud(
+    mv_pred_list: list[MultiviewPred], depth_list: list[Float32[ndarray, "H W"]] | None = None
+) -> Float32[ndarray, "num_points 3"]:
+    if depth_list is None:
+        depth_maps: Float32[ndarray, "b h w 1"] = np.stack(
+            [rearrange(mv_pred.depth_map, "h w -> h w 1") for mv_pred in mv_pred_list], axis=0
+        ).astype(np.float32)
+    else:
+        depth_maps: Float32[ndarray, "b h w 1"] = np.stack(
+            [rearrange(depth, "h w -> h w 1") for depth in depth_list], axis=0
+        ).astype(np.float32)
+
+    # multidepth_to_points requires world_T_cam not cam_T_world
+    world_T_cam_b44: Float32[ndarray, "num_cams 4 4"] = np.stack(
+        [mv_pred.pinhole_param.extrinsics.world_T_cam for mv_pred in mv_pred_list], axis=0
+    ).astype(np.float32)
+    K_b33: Float32[ndarray, "b 3 3"] = np.stack(
+        [mv_pred.pinhole_param.intrinsics.k_matrix for mv_pred in mv_pred_list], axis=0
+    ).astype(np.float32)
+    world_points: Float32[ndarray, "b h w 3"] = multidepth_to_points(
+        depth_maps=depth_maps, world_T_cam_batch=world_T_cam_b44, K_b33=K_b33
+    )
+    pointcloud: Float32[ndarray, "num_points 3"] = world_points.reshape(-1, 3)
+    return pointcloud
+
+
 def run_inference(config: VGGTInferenceConfig) -> None:
     print("Running inference on images in", config.image_dir)
 
@@ -451,33 +475,17 @@ def run_inference(config: VGGTInferenceConfig) -> None:
     )
     mv_pred_list: list[MultiviewPred] = vggt_predictor(rgb_list=rgb_list)
 
-    ###
     mv_pred_list = orient_mv_pred_list(mv_pred_list)
-
-    # multidepth_to_points requires world_T_cam not cam_T_world
-    world_T_cam_b44: Float32[ndarray, "num_cams 4 4"] = np.stack(
-        [mv_pred.pinhole_param.extrinsics.world_T_cam for mv_pred in mv_pred_list], axis=0
-    ).astype(np.float32)
-    K_b33: Float32[ndarray, "b 3 3"] = np.stack(
-        [mv_pred.pinhole_param.intrinsics.k_matrix for mv_pred in mv_pred_list], axis=0
-    ).astype(np.float32)
-    depth_maps: Float32[ndarray, "b h w 1"] = np.stack(
-        [rearrange(mv_pred.depth_map, "h w -> h w 1") for mv_pred in mv_pred_list], axis=0
-    ).astype(np.float32)
-    world_points: Float32[ndarray, "b h w 3"] = multidepth_to_points(
-        depth_maps=depth_maps, world_T_cam_batch=world_T_cam_b44, K_b33=K_b33
+    pointcloud: Float32[ndarray, "num_points 3"] = mv_pred_to_pointcloud(mv_pred_list)
+    rgb_stack: UInt8[ndarray, "num_points 3"] = np.concatenate(
+        [rearrange(mv_pred.rgb_image, "h w c -> (h w) c") for mv_pred in mv_pred_list]
     )
-    ###
 
+    # create depth confidence values using robust filtering for top keep percentile
     depth_confidences: list[UInt8[ndarray, "H W"]] = [
         robust_filter_confidences(mv_pred.confidence_mask, keep_top_percent=config.keep_top_percent)
         for mv_pred in mv_pred_list
     ]
-
-    pointcloud: Float32[ndarray, "num_points 3"] = world_points.reshape(-1, 3)
-    rgb_stack: UInt8[ndarray, "num_points 3"] = np.concatenate(
-        [rearrange(mv_pred.rgb_image, "h w c -> (h w) c") for mv_pred in mv_pred_list]
-    )
     pc_conf_mask: Bool[ndarray, "num_points"] = np.concatenate(
         [rearrange(depth_conf, "h w -> (h w)") for depth_conf in depth_confidences]
     ).astype(bool)
@@ -493,7 +501,7 @@ def run_inference(config: VGGTInferenceConfig) -> None:
 
     # Automatically determine optimal voxel size based on point cloud characteristics
     voxel_size: float = estimate_voxel_size(filtered_points_pre_ds, target_points=200_000)
-    pcd_ds = pcd.voxel_down_sample(voxel_size)
+    pcd_ds: o3d.geometry.PointCloud = pcd.voxel_down_sample(voxel_size)
 
     filtered_points: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.points, dtype=np.float32)
     filtered_colors: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.colors, dtype=np.float32)
@@ -569,20 +577,7 @@ def run_inference(config: VGGTInferenceConfig) -> None:
             static=True,
         )
 
-    # stack moge depth into a pointcloud, and downscale it similar to the original pointcloud, log ti as moge pointcloud
-    world_T_cam_b44: Float32[ndarray, "num_cams 4 4"] = np.stack(
-        [mv_pred.pinhole_param.extrinsics.world_T_cam for mv_pred in mv_pred_list], axis=0
-    ).astype(np.float32)
-    K_b33: Float32[ndarray, "b 3 3"] = np.stack(
-        [mv_pred.pinhole_param.intrinsics.k_matrix for mv_pred in mv_pred_list], axis=0
-    ).astype(np.float32)
-    moge_depth_maps: Float32[ndarray, "b h w 1"] = np.stack(
-        [rearrange(moge_depth, "h w -> h w 1") for moge_depth in moge_list], axis=0
-    ).astype(np.float32)
-    moge_points: Float32[ndarray, "b h w 3"] = multidepth_to_points(
-        depth_maps=moge_depth_maps, world_T_cam_batch=world_T_cam_b44, K_b33=K_b33
-    )
-
+    moge_points: Float32[ndarray, "num_points 3"] = mv_pred_to_pointcloud(mv_pred_list, depth_list=moge_list)
     new_pc: Float32[ndarray, "num_points 3"] = moge_points.reshape(-1, 3)
     rgb_stack: UInt8[ndarray, "num_points 3"] = np.concatenate(
         [rearrange(mv_pred.rgb_image, "h w c -> (h w) c") for mv_pred in mv_pred_list]
