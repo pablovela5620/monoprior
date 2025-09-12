@@ -1,7 +1,5 @@
-import os
 from dataclasses import dataclass, replace
 from pathlib import Path
-from re import match
 from timeit import default_timer as timer
 from typing import Literal
 
@@ -12,16 +10,15 @@ import rerun as rr
 import rerun.blueprint as rrb
 import torch
 from einops import rearrange
-from jaxtyping import Bool, Float, Float32, UInt8
+from jaxtyping import Bool, Float, Float32, Int, UInt8
 from numpy import ndarray
-from scipy.spatial.transform import Rotation
-from simplecv.camera_parameters import Extrinsics
+from simplecv.camera_orient_utils import auto_orient_and_center_poses
+from simplecv.camera_parameters import Extrinsics, PinholeParameters
 from simplecv.ops.conventions import CameraConventions, convert_pose
 from simplecv.rerun_log_utils import RerunTyroConfig, log_pinhole, log_video
 from simplecv.video_io import MultiVideoReader
 from tqdm.auto import trange
 
-from monopriors.camera_numpy_utils import auto_orient_and_center_poses
 from monopriors.depth_utils import depth_edges_mask, multidepth_to_points
 from monopriors.multiview_models.vggt_model import MultiviewPred, VGGTPredictor, robust_filter_confidences
 from monopriors.relative_depth_models import (
@@ -65,13 +62,14 @@ def create_depth_views(parent_log_path: Path, camera_index: int) -> rrb.Tabs:
                 name="Filtered Depth",
             ),
             rrb.Spatial2DView(
-                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/moge_depth",
+                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/refined_depth",
                 contents=[
                     "+ $origin/**",
                 ],
                 name="MoGe Depth",
             ),
-        ]
+        ],
+        active_tab=2,
     )
     return depth_views
 
@@ -90,11 +88,11 @@ def create_camera_row(parent_log_path: Path, camera_index: int) -> rrb.Horizonta
     camera_row: rrb.Horizontal = rrb.Horizontal(
         contents=[
             rrb.Spatial2DView(
-                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/",
+                origin=f"{parent_log_path}/camera_{camera_index}/pinhole/image",
                 contents=[
                     "+ $origin/**",
                 ],
-                name="Pinhole Content",
+                name="Image Content",
             ),
             create_depth_views(parent_log_path, camera_index),
             rrb.Spatial2DView(
@@ -152,7 +150,7 @@ def create_tabbed_camera_view(parent_log_path: Path, num_cameras: int) -> rrb.Ta
         tab_content: rrb.Vertical = rrb.Vertical(contents=camera_rows, name=tab_name)
         tabs.append(tab_content)
 
-    tabbed_view: rrb.Tabs = rrb.Tabs(contents=tabs)
+    tabbed_view: rrb.Tabs = rrb.Tabs(contents=tabs, name="Depths Tab")
     return tabbed_view
 
 
@@ -164,8 +162,9 @@ def create_blueprint(parent_log_path: Path, num_images: int, show_videos: bool =
             # don't include depths in the 3D view, as they can be very noisy
             *[f"- /{parent_log_path}/camera_{i}/pinhole/depth" for i in range(num_images)],
             *[f"- /{parent_log_path}/camera_{i}/pinhole/filtered_depth" for i in range(num_images)],
-            *[f"- /{parent_log_path}/camera_{i}/pinhole/moge_depth" for i in range(num_images)],
+            *[f"- /{parent_log_path}/camera_{i}/pinhole/refined_depth" for i in range(num_images)],
             *[f"- /{parent_log_path}/camera_{i}/pinhole/confidence" for i in range(num_images)],
+            *[f"- /{parent_log_path}/camera_{i}/pinhole/image" for i in range(num_images)],
         ],
         line_grid=rrb.archetypes.LineGrid3D(visible=False),
     )
@@ -175,9 +174,10 @@ def create_blueprint(parent_log_path: Path, num_images: int, show_videos: bool =
     if show_videos:
         view_2d_videos: rrb.Grid = rrb.Grid(
             contents=[
-                rrb.Spatial2DView(origin=f"{parent_log_path}/camera_{i}/video", name=f"Video {i + 1}")
+                rrb.Spatial2DView(origin=f"{parent_log_path}/camera_{i}/pinhole/video", name=f"Video {i + 1}")
                 for i in range(num_images)
-            ]
+            ],
+            name="Videos Tab",
         )
         view_2d = rrb.Tabs(view_2d, view_2d_videos)
 
@@ -185,108 +185,10 @@ def create_blueprint(parent_log_path: Path, num_images: int, show_videos: bool =
     return blueprint
 
 
-def write_colmap_cameras_txt(
-    file_path: str, intrinsics: Float32[ndarray, "n 3 3"], image_width: int, image_height: int
-) -> None:
-    """Write camera intrinsics to COLMAP cameras.txt format."""
-    with open(file_path, "w") as f:
-        f.write("# Camera list with one line of data per camera:\n")
-        f.write("#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n")
-        f.write(f"# Number of cameras: {len(intrinsics)}\n")
-
-        for i, intrinsic in enumerate(intrinsics):
-            camera_id = i + 1  # COLMAP uses 1-indexed camera IDs
-            model = "PINHOLE"
-
-            fx = intrinsic[0, 0]
-            fy = intrinsic[1, 1]
-            cx = intrinsic[0, 2]
-            cy = intrinsic[1, 2]
-
-            f.write(f"{camera_id} {model} {image_width} {image_height} {fx} {fy} {cx} {cy}\n")
-
-
-def write_colmap_images_txt(
-    file_path: str,
-    quaternions: np.ndarray,
-    translations: np.ndarray,
-    image_points2D: list[list],  # empty list for now
-    image_names: list[str],
-):
-    """Write camera poses and keypoints to COLMAP images.txt format."""
-    with open(file_path, "w") as f:
-        f.write("# Image list with two lines of data per image:\n")
-        f.write("#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME\n")
-        f.write("#   POINTS2D[] as (X, Y, POINT3D_ID)\n")
-
-        # num_points = sum(len(points) for points in image_points2D)
-        # avg_points = num_points / len(image_points2D) if image_points2D else 0
-        avg_points = 0  # Placeholder for now
-        f.write(f"# Number of images: {len(quaternions)}, mean observations per image: {avg_points:.1f}\n")
-
-        for i in range(len(quaternions)):
-            image_id = i + 1
-            camera_id = i + 1
-
-            qw, qx, qy, qz = quaternions[i]
-            tx, ty, tz = translations[i]
-
-            f.write(f"{image_id} {qw} {qx} {qy} {qz} {tx} {ty} {tz} {camera_id} {os.path.basename(image_names[i])}\n")
-
-            # points_line = " ".join([f"{x} {y} {point3d_id + 1}" for x, y, point3d_id in image_points2D[i]])
-            points_line = " ".join([""])  # Placeholder for now
-            f.write(f"{points_line}\n")
-
-
-def write_colmap_points3D_txt(file_path: str, points3D: list) -> None:
-    """Write 3D points and tracks to COLMAP points3D.txt format."""
-    with open(file_path, "w") as f:
-        f.write("# 3D point list with one line of data per point:\n")
-        f.write("#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)\n")
-
-        # set the average track length to 0 for now
-        avg_track_length: Literal[0] = 0
-        f.write(f"# Number of points: {len(points3D)}, mean track length: {avg_track_length:.4f}\n")
-
-        for point in points3D:
-            point_id = point["id"] + 1
-            x, y, z = point["xyz"]
-            r, g, b = point["rgb"]
-            error = point["error"]
-
-            # track = " ".join([f"{img_id + 1} {point2d_idx}" for img_id, point2d_idx in point["track"]])
-            track = " ".join([""])
-
-            f.write(f"{point_id} {x} {y} {z} {int(r)} {int(g)} {int(b)} {error} {track}\n")
-
-
-def extrinsic_to_colmap_format(mv_pred_list: list[MultiviewPred]) -> tuple[np.ndarray, np.ndarray]:
-    """Convert extrinsic matrices to COLMAP format (quaternion + translation)."""
-    quaternions = []
-    translations = []
-
-    for mv_pred in mv_pred_list:
-        extrinsic: Extrinsics = mv_pred.pinhole_param.extrinsics
-        # VGGT's extrinsic is camera-to-world (R|t) format
-        R = extrinsic.cam_R_world
-        t = extrinsic.cam_t_world
-
-        # Convert rotation matrix to quaternion
-        # COLMAP quaternion format is [qw, qx, qy, qz]
-        rot = Rotation.from_matrix(R)
-        quat = rot.as_quat()  # scipy returns [x, y, z, w]
-        quat = np.array([quat[3], quat[0], quat[1], quat[2]])  # Convert to [w, x, y, z]
-
-        quaternions.append(quat)
-        translations.append(t)
-
-    return np.array(quaternions), np.array(translations)
-
-
 def orient_mv_pred_list(
     mv_pred_list: list[MultiviewPred],
     method: Literal["pca", "up", "vertical", "none"] = "up",
-    center_method: Literal["poses", "focus", "none"] = "poses",
+    center_method: Literal["poses", "focus", "none"] = "none",
 ) -> list[MultiviewPred]:
     extri_list: list[Extrinsics] = [mv_pred.pinhole_param.extrinsics for mv_pred in mv_pred_list]
 
@@ -438,61 +340,82 @@ def mv_pred_to_pointcloud(
 class VGGTInferenceConfig:
     rr_config: RerunTyroConfig
     image_dir: Path | None = None
-    videos_dir: Path | None = None
-    timestep: int = 1
     """Directory containing input images."""
-    keep_top_percent: int | float = 50.0
+    videos_dir: Path | None = None
+    """Directory containing input videos."""
+    ts_idx: int = 0
+    """Timestep for video chosen frames."""
+    keep_top_percent: int | float = 30.0
     """keep_top_percent: Percentage in [0,100]. Interpreted as the fraction to discard;
         the top (100 - keep_top_percent)% of pixel scores are kept.
         E.g. 75 -> keep top 25%; 30 -> keep top 70%."""
     preprocessing_mode: Literal["crop", "pad"] = "crop"
     """Mode for image preprocessing: 'crop' preserves aspect ratio, 'pad' adds white padding"""
+    refine_depth_maps: bool = False
+    """Whether to refine depth maps during processing. To make them metric"""
+    max_frames: int | None = None
+    """Maximum number of frames to process. If None, all frames are processed."""
     output_dir: Path | None = None
     """Output directory for colmap version. If None, results are not saved."""
 
 
-def run_inference(config: VGGTInferenceConfig) -> None:
+def main(config: VGGTInferenceConfig) -> None:
     parent_log_path = Path("world")
+    timeline = "video_time"
 
     if config.image_dir is None and config.videos_dir is None:
         raise ValueError("Either image or videos directory must be specified")
-    if config.image_dir is not None:
-        image_paths = []
 
-        for ext in SUPPORTED_IMAGE_EXTENSIONS:
-            image_paths.extend(config.image_dir.glob(f"*{ext}"))
-        image_paths: list[Path] = sorted(image_paths)
-        assert len(image_paths) > 0, (
-            f"No images found in {config.image_dir} in supported formats {SUPPORTED_IMAGE_EXTENSIONS}"
-        )
+    ###################
+    # 0. Parse inputs #
+    ###################
+    input_type: Literal["videos", "images"] = "images" if config.image_dir is not None else "videos"
+    match input_type:
+        case "images":
+            image_paths = []
 
-        bgr_list: list[UInt8[ndarray, "H W 3"]] = [cv2.imread(str(image_path)) for image_path in image_paths]
-        rgb_list: list[UInt8[ndarray, "H W 3"]] = [cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB) for bgr in bgr_list]
-    if config.videos_dir is not None:
-        video_path_list: list[Path] = sorted(config.videos_dir.glob("*.mp4"))
-        assert len(video_path_list) > 0, f"No videos found in {config.videos_dir}"
-        for i, video_path in enumerate(video_path_list):
-            log_video(video_path=video_path, video_log_path=f"{parent_log_path}/camera_{i}/video")
-        mv_reader = MultiVideoReader(video_path_list)
-        bgr_list: list[UInt8[ndarray, "H W 3"]] = mv_reader[config.timestep]
-        rgb_list: list[UInt8[ndarray, "H W 3"]] = [cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB) for bgr in bgr_list]
+            for ext in SUPPORTED_IMAGE_EXTENSIONS:
+                image_paths.extend(config.image_dir.glob(f"*{ext}"))
+            image_paths: list[Path] = sorted(image_paths)
+            assert len(image_paths) > 0, (
+                f"No images found in {config.image_dir} in supported formats {SUPPORTED_IMAGE_EXTENSIONS}"
+            )
+
+            bgr_list: list[UInt8[ndarray, "H W 3"]] = [cv2.imread(str(image_path)) for image_path in image_paths]
+        case "videos":
+            video_path_list: list[Path] = sorted(config.videos_dir.glob("*.mp4"))
+            assert len(video_path_list) > 0, f"No videos found in {config.videos_dir}"
+            exo_timestamps: list[Int[ndarray, "num_frames"]] = []
+            for i, video_path in enumerate(video_path_list):
+                frame_timestamps_ns: Int[ndarray, "num_frames"] = log_video(
+                    video_path=video_path,
+                    video_log_path=parent_log_path / f"camera_{i}" / "pinhole" / "video",
+                    timeline=timeline,
+                    max_frames=config.max_frames,
+                )
+                exo_timestamps.append(frame_timestamps_ns)
+
+            mv_reader = MultiVideoReader(video_path_list)
+            bgr_list: list[UInt8[ndarray, "H W 3"]] = mv_reader[config.ts_idx]
+
+    rgb_list: list[UInt8[ndarray, "H W 3"]] = [cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB) for bgr in bgr_list]
 
     start: float = timer()
 
-    # initialize rerun
-    blueprint = create_blueprint(
+    blueprint: rrb.Blueprint = create_blueprint(
         parent_log_path=parent_log_path, num_images=len(rgb_list), show_videos=config.videos_dir is not None
     )
     rr.send_blueprint(blueprint=blueprint)
     rr.log(f"{parent_log_path}", rr.ViewCoordinates.RFU, static=True)
+    rr.set_time(timeline, duration=0)
 
     vggt_predictor = VGGTPredictor(
         device=device,
         preprocessing_mode=config.preprocessing_mode,
     )
     mv_pred_list: list[MultiviewPred] = vggt_predictor(rgb_list=rgb_list)
-
     mv_pred_list = orient_mv_pred_list(mv_pred_list)
+
     pointcloud: Float32[ndarray, "num_points 3"] = mv_pred_to_pointcloud(mv_pred_list)
     rgb_stack: UInt8[ndarray, "num_points 3"] = np.concatenate(
         [rearrange(mv_pred.rgb_image, "h w c -> (h w) c") for mv_pred in mv_pred_list]
@@ -503,6 +426,8 @@ def run_inference(config: VGGTInferenceConfig) -> None:
         robust_filter_confidences(mv_pred.confidence_mask, keep_top_percent=config.keep_top_percent)
         for mv_pred in mv_pred_list
     ]
+
+    # new_depth_confidences = depth_confidences
     pc_conf_mask: Bool[ndarray, "num_points"] = np.concatenate(
         [rearrange(depth_conf, "h w -> (h w)") for depth_conf in depth_confidences]
     ).astype(bool)
@@ -531,10 +456,9 @@ def run_inference(config: VGGTInferenceConfig) -> None:
         ),
         static=True,
     )
-
-    predictor: BaseRelativePredictor = get_relative_predictor("MogeV1Predictor")(device="cuda")
-    intri_stack_list: list[Float32[ndarray, "3 3"]] = []
-    moge_list: list[Float32[ndarray, "H W"]] = []
+    if config.refine_depth_maps:
+        predictor: BaseRelativePredictor = get_relative_predictor("MogeV1Predictor")(device="cuda")
+        refined_depths_list: list[Float32[ndarray, "H W"]] = []
     mv_pred: MultiviewPred
     for mv_pred in mv_pred_list:
         cam_log_path: Path = parent_log_path / mv_pred.cam_name
@@ -542,31 +466,30 @@ def run_inference(config: VGGTInferenceConfig) -> None:
 
         depth_map: Float32[ndarray, "H W"] = mv_pred.depth_map
         depth_conf: UInt8[ndarray, "H W"] = depth_confidences[mv_pred_list.index(mv_pred)]
-
         # Filter depth
         filtered_depth_map: Float32[ndarray, "H W"] = np.where(depth_conf > 0, depth_map, 0)
 
-        relative_pred: RelativeDepthPrediction = predictor.__call__(
-            rgb=mv_pred.rgb_image, K_33=mv_pred.pinhole_param.intrinsics.k_matrix
-        )
+        if config.refine_depth_maps:
+            relative_pred: RelativeDepthPrediction = predictor.__call__(
+                rgb=mv_pred.rgb_image, K_33=mv_pred.pinhole_param.intrinsics.k_matrix
+            )
 
-        scale, shift = compute_scale_and_shift(
-            relative_pred.depth, filtered_depth_map, mask=depth_conf > 0, scale_only=False
-        )
-        moge_depth: Float32[np.ndarray, "h w"] = relative_pred.depth * scale + shift
-        # filter depth
-        edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(moge_depth, threshold=0.01)
-        moge_depth: Float32[np.ndarray, "h w"] = moge_depth * ~edges_mask
+            scale, shift = compute_scale_and_shift(
+                relative_pred.depth, filtered_depth_map, mask=depth_conf > 0, scale_only=False
+            )
+            metric_depth: Float32[np.ndarray, "h w"] = relative_pred.depth.copy() * scale + shift
+            # filter depth
+            edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(metric_depth, threshold=0.01)
+            metric_depth: Float32[np.ndarray, "h w"] = metric_depth * ~edges_mask
 
-        moge_list.append(moge_depth)
+            refined_depths_list.append(metric_depth)
 
         log_pinhole(
             mv_pred.pinhole_param,
             cam_log_path=cam_log_path,
-            image_plane_distance=0.1,
+            image_plane_distance=0.05,
             static=True,
         )
-        intri_stack_list.append(mv_pred.pinhole_param.intrinsics.k_matrix)
 
         rr.log(
             f"{pinhole_log_path}/image",
@@ -588,76 +511,60 @@ def run_inference(config: VGGTInferenceConfig) -> None:
             rr.DepthImage(depth_map, meter=1),
             static=True,
         )
+        if config.refine_depth_maps:
+            rr.log(
+                f"{pinhole_log_path}/refined_depth",
+                rr.DepthImage(metric_depth, meter=1),
+                static=True,
+            )
+
+    if config.refine_depth_maps:
+        moge_points: Float32[ndarray, "num_points 3"] = mv_pred_to_pointcloud(
+            mv_pred_list, depth_list=refined_depths_list
+        )
+        new_pc: Float32[ndarray, "num_points 3"] = moge_points.reshape(-1, 3)
+        rgb_stack: UInt8[ndarray, "num_points 3"] = np.concatenate(
+            [rearrange(mv_pred.rgb_image, "h w c -> (h w) c") for mv_pred in mv_pred_list]
+        )
+
+        # Create point cloud from high-confidence points only
+        pcd: o3d.geometry.PointCloud = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(new_pc)
+        pcd.colors = o3d.utility.Vector3dVector(rgb_stack / 255.0)  # Open3D expects [0,1] range
+
+        # Automatically determine optimal voxel size based on point cloud characteristics
+        voxel_size: float = estimate_voxel_size(new_pc, target_points=500_000)
+        pcd_ds = pcd.voxel_down_sample(voxel_size)
+
+        filtered_points: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.points, dtype=np.float32)
+        filtered_colors: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.colors, dtype=np.float32)
+
         rr.log(
-            f"{pinhole_log_path}/moge_depth",
-            rr.DepthImage(moge_depth, meter=1),
+            f"{parent_log_path}/moge_point_cloud",
+            rr.Points3D(
+                filtered_points,
+                colors=filtered_colors,
+            ),
             static=True,
         )
 
-    moge_points: Float32[ndarray, "num_points 3"] = mv_pred_to_pointcloud(mv_pred_list, depth_list=moge_list)
-    new_pc: Float32[ndarray, "num_points 3"] = moge_points.reshape(-1, 3)
-    rgb_stack: UInt8[ndarray, "num_points 3"] = np.concatenate(
-        [rearrange(mv_pred.rgb_image, "h w c -> (h w) c") for mv_pred in mv_pred_list]
-    )
-
-    # Create point cloud from high-confidence points only
-    pcd: o3d.geometry.PointCloud = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(new_pc)
-    pcd.colors = o3d.utility.Vector3dVector(rgb_stack / 255.0)  # Open3D expects [0,1] range
-
-    # Automatically determine optimal voxel size based on point cloud characteristics
-    voxel_size: float = estimate_voxel_size(new_pc, target_points=500_000)
-    pcd_ds = pcd.voxel_down_sample(voxel_size)
-
-    filtered_points: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.points, dtype=np.float32)
-    filtered_colors: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.colors, dtype=np.float32)
-
-    rr.log(
-        f"{parent_log_path}/moge_point_cloud",
-        rr.Points3D(
-            filtered_points,
-            colors=filtered_colors,
-        ),
-        static=True,
-    )
-
-    intri_stack: Float32[ndarray, "num_cams 3 3"] = np.stack(intri_stack_list, axis=0, dtype=np.float32)
-
-    if config.output_dir is not None:
-        config.output_dir.mkdir(parents=True, exist_ok=True)
-        write_colmap_cameras_txt(
-            file_path=str(config.output_dir / "cameras.txt"),
-            intrinsics=intri_stack,
-            image_width=mv_pred_list[0].pinhole_param.intrinsics.width,
-            image_height=mv_pred_list[0].pinhole_param.intrinsics.height,
-        )
-        quaternions, translations = extrinsic_to_colmap_format(mv_pred_list)
-        image_points2D_empty = [[] for _ in range(len(mv_pred_list))]  # Initialize with empty lists
-        write_colmap_images_txt(
-            file_path=str(config.output_dir / "images.txt"),
-            quaternions=quaternions,
-            translations=translations,
-            image_points2D=image_points2D_empty,
-            image_names=[image_path.name for image_path in image_paths],
-        )
-
-        write_colmap_points3D_txt(
-            file_path=str(config.output_dir / "points3D.txt"),
-            points3D=[
-                {
-                    "id": i,
-                    "xyz": xyz,
-                    "rgb": rgb * 255,
-                    "error": 1.0,
-                    "track": [],
-                }
-                for i, (xyz, rgb) in enumerate(
-                    zip(
-                        filtered_points,
-                        filtered_colors,
-                        strict=True,
-                    )
-                )
-            ],
-        )
     print(f"Inference completed in {timer() - start:.2f} seconds")
+
+
+def unload_vggt_model(vggt_predictor: VGGTPredictor) -> None:
+    """
+    Unload the VGGT model from memory by moving it to CPU and deleting references.
+    This helps free GPU memory more effectively.
+
+    Args:
+        vggt_predictor: The VGGTPredictor instance containing the model to unload
+    """
+    # Move model to CPU first (helps with GPU memory cleanup)
+    if hasattr(vggt_predictor, "model") and vggt_predictor.model is not None:
+        vggt_predictor.model.cpu()
+        # Remove reference to model
+        vggt_predictor.model = None
+        # Clear GPU cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print("VGGT model unloaded from memory")
