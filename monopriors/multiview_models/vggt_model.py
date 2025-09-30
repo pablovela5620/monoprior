@@ -1,6 +1,8 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from timeit import default_timer as timer
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 import cv2
 import numpy as np
@@ -18,6 +20,21 @@ from vggt.models.vggt import VGGT
 from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 
 from monopriors.depth_utils import multidepth_to_points
+
+
+@contextmanager
+def amp_autocast(device_type: Literal["cpu", "cuda"], dtype: torch.dtype) -> Iterator[None]:
+    """Context manager that wraps torch.amp.autocast with explicit enter/exit."""
+
+    if device_type == "cuda":
+        autocast_cm: Any = torch.amp.autocast(device_type=device_type, dtype=dtype)
+        autocast_cm.__enter__()
+        try:
+            yield None
+        finally:
+            autocast_cm.__exit__(None, None, None)
+    else:
+        yield None
 
 
 class PreprocessingMetadata(TypedDict):
@@ -103,6 +120,7 @@ def preprocess_images(
     to_tensor = TF.ToTensor()
     target_size = 518
     metadata_list: list[PreprocessingMetadata] = []
+    mode_literal: Literal["crop", "pad"] = mode
 
     # First process all images and collect their shapes
     for rgb in rgb_list:
@@ -113,7 +131,7 @@ def preprocess_images(
         # Initialize metadata as TypedDict with explicit constructor
         metadata = PreprocessingMetadata(
             original_size=(original_width, original_height),
-            mode=mode,
+            mode=mode_literal,
             target_size=target_size,
             padding={"top": 0, "left": 0, "right": 0, "bottom": 0},
             new_size=(0, 0),  # Will be filled later
@@ -140,7 +158,7 @@ def preprocess_images(
             metadata["padding"] = {"top": pad_top, "bottom": pad_bottom, "left": pad_left, "right": pad_right}
 
             # Resize with new dimensions using PIL's BICUBIC
-            pil_img = pil_img.resize((new_width, new_height), Image.BICUBIC)
+            pil_img = pil_img.resize((new_width, new_height), Image.Resampling.BICUBIC)
 
             # Convert to tensor
             img = to_tensor(pil_img)
@@ -160,7 +178,7 @@ def preprocess_images(
             metadata["new_size"] = (new_width, new_height)
 
             # Resize with new dimensions using PIL's BICUBIC for exact matching
-            pil_img = pil_img.resize((new_width, new_height), Image.BICUBIC)
+            pil_img = pil_img.resize((new_width, new_height), Image.Resampling.BICUBIC)
 
             # Convert to tensor using the same to_tensor transform
             img = to_tensor(pil_img)  # Convert to tensor (0, 1)
@@ -475,7 +493,7 @@ class VGGTPredictor:
         self.preprocessing_mode: Literal["crop", "pad"] = preprocessing_mode
         load_start: float = timer()
         print("Loading model...")
-        self.model: VGGT = VGGT.from_pretrained("facebook/VGGT-1B", local_files_only=True).to(self.device)
+        self.model: VGGT | None = VGGT.from_pretrained("facebook/VGGT-1B", local_files_only=True).to(self.device)
         print("Model loaded in", timer() - load_start, "seconds")
         self.dtype: torch.dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
 
@@ -485,9 +503,12 @@ class VGGTPredictor:
 
         # Run inference
         print("Running inference...")
-        with torch.no_grad(), torch.amp.autocast("cuda", dtype=self.dtype):
+        with torch.no_grad(), amp_autocast(device_type=self.device, dtype=self.dtype):
             # run model and convert to dataclass for type validaton + easy access
-            predictions: dict = self.model(img_tensors)
+            if self.model is not None:
+                predictions: dict = self.model(img_tensors)
+            else:
+                raise RuntimeError("Model is not loaded. Please reload the model before inference.")
 
         # Convert pose encoding to extrinsic and intrinsic matrices
         print("Converting pose encoding to extrinsic and intrinsic matrices...")
@@ -510,3 +531,22 @@ class VGGTPredictor:
             metadata_list=preprocess_results.metadata if self.preprocessing_mode == "pad" else None,
         )
         return calibration_data
+
+
+def unload_vggt_model(vggt_predictor: VGGTPredictor) -> None:
+    """
+    Unload the VGGT model from memory by moving it to CPU and deleting references.
+    This helps free GPU memory more effectively.
+
+    Args:
+        vggt_predictor: The VGGTPredictor instance containing the model to unload
+    """
+    # Move model to CPU first (helps with GPU memory cleanup)
+    if hasattr(vggt_predictor, "model") and vggt_predictor.model is not None:
+        vggt_predictor.model.cpu()
+        # Remove reference to model
+        vggt_predictor.model = None
+        # Clear GPU cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print("VGGT model unloaded from memory")
