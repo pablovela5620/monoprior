@@ -639,7 +639,7 @@ environments:
       - pypi: git+https://github.com/facebookresearch/segment-anything-2.git?rev=2b90b9f5ceec907a1c18123530e92e794ad901a4#2b90b9f5ceec907a1c18123530e92e794ad901a4
       - pypi: https://files.pythonhosted.org/packages/6a/23/8146aad7d88f4fcb3a6218f41a60f6c2d4e3a72de72da1825dc7c8f7877c/semantic_version-2.10.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl
-      - pypi: git+https://github.com/pablovela5620/simplecv.git?rev=846090ca64a2cbfef5be84109e43c5c774c46708#846090ca64a2cbfef5be84109e43c5c774c46708
+      - pypi: git+https://github.com/pablovela5620/simplecv.git?rev=f771dcad958e5a844333380e344f497ecff9652b#f771dcad958e5a844333380e344f497ecff9652b
       - pypi: https://files.pythonhosted.org/packages/be/72/2db2f49247d0a18b4f1bb9a5a39a0162869acf235f3a96418363947b3d46/starlette-0.48.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4f/bd/de8d508070629b6d84a30d01d57e4a65c69aa7f5abe7560b8fad3b50ea59/termcolor-3.1.0-py3-none-any.whl
@@ -1306,7 +1306,7 @@ environments:
       - pypi: git+https://github.com/facebookresearch/segment-anything-2.git?rev=2b90b9f5ceec907a1c18123530e92e794ad901a4#2b90b9f5ceec907a1c18123530e92e794ad901a4
       - pypi: https://files.pythonhosted.org/packages/6a/23/8146aad7d88f4fcb3a6218f41a60f6c2d4e3a72de72da1825dc7c8f7877c/semantic_version-2.10.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl
-      - pypi: git+https://github.com/pablovela5620/simplecv.git?rev=846090ca64a2cbfef5be84109e43c5c774c46708#846090ca64a2cbfef5be84109e43c5c774c46708
+      - pypi: git+https://github.com/pablovela5620/simplecv.git?rev=f771dcad958e5a844333380e344f497ecff9652b#f771dcad958e5a844333380e344f497ecff9652b
       - pypi: https://files.pythonhosted.org/packages/be/72/2db2f49247d0a18b4f1bb9a5a39a0162869acf235f3a96418363947b3d46/starlette-0.48.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4f/bd/de8d508070629b6d84a30d01d57e4a65c69aa7f5abe7560b8fad3b50ea59/termcolor-3.1.0-py3-none-any.whl
@@ -7351,7 +7351,7 @@ packages:
 - pypi: ./
   name: monopriors
   version: 0.3.2
-  sha256: 96803f0f0a896cabb909abc85136ff2d1f27cb8a2e8158ce4659ecc3bb2c8b4d
+  sha256: cd6e7b5d607a53b0e8a26e5a5187b73862516ca203a12a77d56075fcccc451ba
   requires_dist:
   - geffnet>=1.0.2
   - omnidata-tools>=0.0.23
@@ -9500,7 +9500,7 @@ packages:
   - pkg:pypi/shtab?source=hash-mapping
   size: 20225
   timestamp: 1744494202036
-- pypi: git+https://github.com/pablovela5620/simplecv.git?rev=846090ca64a2cbfef5be84109e43c5c774c46708#846090ca64a2cbfef5be84109e43c5c774c46708
+- pypi: git+https://github.com/pablovela5620/simplecv.git?rev=f771dcad958e5a844333380e344f497ecff9652b#f771dcad958e5a844333380e344f497ecff9652b
   name: simplecv
   version: 0.6.0
   requires_dist:

@@ -123,7 +123,7 @@ natsort = ">=8.4.0,<9"
 
 [tool.pixi.pypi-dependencies]
 monopriors = { path = ".", editable = true }
-simplecv = { git = "https://github.com/pablovela5620/simplecv.git", rev = "846090ca64a2cbfef5be84109e43c5c774c46708" }
+simplecv = { git = "https://github.com/pablovela5620/simplecv.git", rev = "f771dcad958e5a844333380e344f497ecff9652b" }
 torch = { version = ">=2.7.0", index = "https://download.pytorch.org/whl/cu128" }
 torchvision = { version = ">=0.20.1", index = "https://download.pytorch.org/whl/cu128" }
 # xformers = { version = "==0.0.30", index = "https://download.pytorch.org/whl/cu128" }
