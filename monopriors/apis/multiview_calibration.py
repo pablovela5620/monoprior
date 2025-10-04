@@ -19,6 +19,7 @@ from simplecv.camera_orient_utils import auto_orient_and_center_poses
 from simplecv.camera_parameters import Extrinsics, PinholeParameters
 from simplecv.ops.conventions import CameraConventions, convert_pose
 from simplecv.ops.pc_utils import estimate_voxel_size
+from simplecv.ops.tsdf_depth_fuser import Open3DScaleInvariantFuser
 from simplecv.rerun_log_utils import RerunTyroConfig, log_pinhole, log_video
 from simplecv.video_io import MultiVideoReader
 
@@ -162,6 +163,7 @@ def create_final_view(parent_log_path: Path, num_images: int, show_videos: bool 
         origin=f"{parent_log_path}",
         contents=[
             "+ $origin/**",
+            f"- /{parent_log_path}/point_cloud",
             # don't include depths in the 3D view, as they can be very noisy
             *[f"- /{parent_log_path}/camera_{i}/pinhole/depth" for i in range(num_images)],
             *[f"- /{parent_log_path}/camera_{i}/pinhole/filtered_depth" for i in range(num_images)],
@@ -454,7 +456,7 @@ class MultiViewCalibrator:
                 # filter depth
                 edges_mask: Bool[np.ndarray, "h w"] = depth_edges_mask(metric_depth, threshold=0.01)
                 metric_depth: Float32[np.ndarray, "h w"] = metric_depth * ~edges_mask
-                metric_depth = np.where(depth_conf > 0, metric_depth, 0)
+                # metric_depth = np.where(depth_conf > 0, metric_depth, 0)
                 # remove people from metric depth
                 if segmask_list[mv_pred_list.index(mv_pred)] is not None:
                     metric_depth: Float32[np.ndarray, "h w"] = metric_depth * ~segmask_list[mv_pred_list.index(mv_pred)]
@@ -612,7 +614,7 @@ def main(config: VGGTInferenceConfig) -> None:
     pcd = output.pcd
 
     # Automatically determine optimal voxel size based on point cloud characteristics
-    voxel_size: float = estimate_voxel_size(np.asarray(pcd.points, dtype=np.float32), target_points=500_000)
+    voxel_size: float = estimate_voxel_size(np.asarray(pcd.points, dtype=np.float32), target_points=150_000)
     pcd_ds = pcd.voxel_down_sample(voxel_size)
 
     filtered_points: Float32[ndarray, "final_points 3"] = np.asarray(pcd_ds.points, dtype=np.float32)
@@ -626,5 +628,51 @@ def main(config: VGGTInferenceConfig) -> None:
         ),
         static=True,
     )
+    # Log camera intrinsics/extrinsics
+    for cam_idx, pinhole_param in enumerate(output.pinhole_param_list):
+        cam_log_path: Path = parent_log_path / f"camera_{cam_idx}"
+        log_pinhole(
+            pinhole_param,
+            cam_log_path=cam_log_path,
+            image_plane_distance=0.05,
+            static=True,
+            recording=None,
+        )
+
+    #####################################
+    # 4. Fuse Depths into TSDF Mesh     #
+    #####################################
+    if output.depth_list and output.pinhole_param_list:
+        depth_fuser = Open3DScaleInvariantFuser(grid_resolution=512)
+        reference_points: Float32[ndarray, "num_points 3"] = np.asarray(pcd.points, dtype=np.float32)
+        depth_fuser.initialise_from_points(reference_points)
+
+        for depth_map, pinhole_param, rgb in zip(
+            output.depth_list,
+            output.pinhole_param_list,
+            rgb_list,
+            strict=True,
+        ):
+            depth_fuser.fuse_frame(depth_hw=depth_map, pinhole=pinhole_param, rgb_hw3=rgb)
+
+        gt_mesh: o3d.geometry.TriangleMesh = depth_fuser.get_mesh()
+        gt_mesh.compute_vertex_normals()
+
+        vertex_positions: Float32[ndarray, "num_vertices 3"] = np.asarray(gt_mesh.vertices, dtype=np.float32)
+        triangle_indices: Int[ndarray, "num_faces 3"] = np.asarray(gt_mesh.triangles, dtype=np.int32)
+
+        vertex_normals: Float32[ndarray, "num_vertices 3"] = np.asarray(gt_mesh.vertex_normals, dtype=np.float32)
+        vertex_colors: Float32[ndarray, "num_vertices 3"] = np.asarray(gt_mesh.vertex_colors, dtype=np.float32)
+
+        rr.log(
+            str(parent_log_path / "gt_mesh"),
+            rr.Mesh3D(
+                vertex_positions=vertex_positions,
+                triangle_indices=triangle_indices,
+                vertex_normals=vertex_normals,
+                vertex_colors=vertex_colors,
+            ),
+            static=True,
+        )
 
     print(f"Inference completed in {timer() - start:.2f} seconds")
