@@ -488,12 +488,15 @@ class VGGTPredictor:
         self,
         device: Literal["cpu", "cuda"],
         preprocessing_mode: Literal["crop", "pad"] = "crop",
+        local_files_only: bool = False,
     ) -> None:
         self.device = device
         self.preprocessing_mode: Literal["crop", "pad"] = preprocessing_mode
         load_start: float = timer()
         print("Loading model...")
-        self.model: VGGT | None = VGGT.from_pretrained("facebook/VGGT-1B", local_files_only=True).to(self.device)
+        self.model: VGGT | None = VGGT.from_pretrained("facebook/VGGT-1B", local_files_only=local_files_only).to(
+            self.device
+        )
         print("Model loaded in", timer() - load_start, "seconds")
         self.dtype: torch.dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
 
